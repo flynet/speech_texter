@@ -176,8 +176,9 @@ The result is written to `dist-installer\VoiceType-Setup-0.1.0.exe`.
 
 This downloads the pinned `nvidia-cublas-cu12` and `nvidia-cudnn-cu12` wheels,
 extracts the Windows DLLs, creates `voicetype-cuda-pack.zip`, and writes
-`SHA256SUMS.txt`. The manual **CUDA pack** GitHub Actions workflow publishes the
-result as release `cuda-pack-v1`.
+`SHA256SUMS.txt`. The **CUDA pack** GitHub Actions workflow (tag
+`cuda-pack-v*` or manual dispatch) publishes the result as release
+`cuda-pack-v1`.
 
 ## Benchmarks
 

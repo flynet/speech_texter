@@ -55,7 +55,7 @@ installer/
   voicetype.iss        # Inno Setup 6
 .github/workflows/
   release.yml          # tag v* -> installer + SHA256SUMS
-  cuda-pack.yml        # manual -> cuda-pack-v1 release
+  cuda-pack.yml        # tag cuda-pack-v* -> cuda-pack-v1 release
 voicetype.spec         # PyInstaller --onedir
 requirements.txt
 requirements-build.txt
@@ -137,7 +137,8 @@ Acceptance: overlay under 100 ms, focus preserved, settings apply live, single i
 
 ### Stage 5 — Updates
 
-- GitHub `releases/latest`, semver comparison, daily + manual checks.
+- GitHub releases list filtered to normal `vX.Y.Z` tags, semver comparison,
+  daily + manual checks.
 - Download installer with progress, verify SHA-256 from `SHA256SUMS.txt`.
 - Run `/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS`, quit the app.
 
@@ -145,7 +146,7 @@ Acceptance: overlay under 100 ms, focus preserved, settings apply live, single i
 
 - `release.yml` on `v*`: Python 3.12, model cache, PyInstaller, Inno Setup, SHA-256,
   GitHub Release with installer and `SHA256SUMS.txt`.
-- Separate manual CUDA-pack workflow.
+- `cuda-pack.yml` on `cuda-pack-v*` or manual dispatch: publish `cuda-pack-v1`.
 - Publish `v0.1.0` and verify the installer on clean Windows 11.
 
 ## 5. Known risks and checks

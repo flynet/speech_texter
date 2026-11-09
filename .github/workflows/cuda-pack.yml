@@ -1,6 +1,9 @@
 name: CUDA pack
 
 on:
+  push:
+    tags:
+      - "cuda-pack-v*"
   workflow_dispatch:
 
 permissions:
