@@ -201,6 +201,7 @@ class HotkeyListenerStartTests(unittest.TestCase):
         class FakeListener:
             def __init__(self, **kwargs) -> None:
                 created.update(kwargs)
+                self._event_filter = kwargs.get("win32_event_filter")
 
             def start(self) -> None:
                 pass
@@ -219,6 +220,23 @@ class HotkeyListenerStartTests(unittest.TestCase):
         self.assertIn("win32_event_filter", created)
         self.assertNotIn("event_filter", created)
         self.assertEqual(created["win32_event_filter"], listener._event_filter)
+
+
+class TrayIconTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_state_icon_uses_application_asset(self) -> None:
+        from voicetype.config import assets_dir
+        from voicetype.ui import tray
+
+        self.assertTrue((assets_dir() / "app.ico").is_file())
+        icon = tray.state_icon("idle")
+        self.assertFalse(icon.isNull())
+        self.assertFalse(icon.pixmap(32, 32).isNull())
 
 
 class HotkeyListenerTests(unittest.TestCase):

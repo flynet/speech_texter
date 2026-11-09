@@ -1,13 +1,13 @@
 ; VoiceType installer (Inno Setup 6)
 ;
 ; Build with:
-;   iscc /DMyAppVersion=0.1.1 installer\voicetype.iss
+;   iscc /DMyAppVersion=0.1.2 installer\voicetype.iss
 ;
 ; The script expects a PyInstaller onedir build in dist\VoiceType, including the
 ; bundled models directory (models\small).
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.1"
+  #define MyAppVersion "0.1.2"
 #endif
 
 #define MyAppName "VoiceType"

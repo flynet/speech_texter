@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtCore import QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QActionGroup, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
+
+from ..config import assets_dir
 
 STATE_COLORS = {
     "idle": "#4CC38A",
@@ -12,8 +14,19 @@ STATE_COLORS = {
     "error": "#E0A64C",
 }
 
+_APP_ICON: QIcon | None = None
 
-def _draw_icon(state: str, size: int) -> QPixmap:
+
+def _app_icon() -> QIcon:
+    """Load the application icon used by the executable and shortcuts."""
+    global _APP_ICON
+    if _APP_ICON is None:
+        path = assets_dir() / "app.ico"
+        _APP_ICON = QIcon(str(path)) if path.is_file() else QIcon()
+    return _APP_ICON
+
+
+def _draw_fallback_icon(state: str, size: int) -> QPixmap:
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
@@ -41,6 +54,39 @@ def _draw_icon(state: str, size: int) -> QPixmap:
     painter.setPen(Qt.NoPen)
     painter.setBrush(QColor(STATE_COLORS.get(state, STATE_COLORS["idle"])))
     painter.drawEllipse(QRectF(42 * scale, 42 * scale, 16 * scale, 16 * scale))
+    painter.end()
+    return pixmap
+
+
+def _draw_icon(state: str, size: int) -> QPixmap:
+    icon = _app_icon()
+    if icon.isNull():
+        return _draw_fallback_icon(state, size)
+
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+    base = icon.pixmap(QSize(size, size))
+    painter.drawPixmap(QRectF(0, 0, size, size), base, QRectF(base.rect()))
+
+    # Keep the status colour as a small badge instead of replacing the
+    # application icon, so the tray matches the executable and shortcuts.
+    if state != "idle":
+        scale = size / 64.0
+        diameter = max(6.0, 18 * scale)
+        margin = max(1.0, 1.5 * scale)
+        painter.setPen(QPen(QColor("#FFFFFF"), max(1.0, 2.0 * scale)))
+        painter.setBrush(QColor(STATE_COLORS.get(state, STATE_COLORS["idle"])))
+        painter.drawEllipse(
+            QRectF(
+                size - diameter - margin,
+                size - diameter - margin,
+                diameter,
+                diameter,
+            )
+        )
     painter.end()
     return pixmap
 
