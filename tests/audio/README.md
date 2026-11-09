@@ -16,3 +16,7 @@ Expected files:
 
 `scripts/bench.py` can read other formats too (via PyAV), but 16 kHz mono WAV is the
 reference input.
+
+The local test pair is derived from a 61 s Russian recording: `ru_60s.wav` is a
+60 s trim, and `ru_3min.wav` repeats the recording to 180 s. All audio files in
+this directory are ignored by git because they contain personal voice data.

@@ -198,14 +198,23 @@ RTF below 1.0 means transcription is faster than real time. Results depend on th
 model, device, CPU, and GPU.
 
 Measured on the development machine (Intel Core i5-12500H, NVIDIA GeForce RTX
-4060 Laptop 8 GB, Windows 11) with 10.59 s of English speech:
+4060 Laptop 8 GB, Windows 11) with 60 seconds of spontaneous Russian speech,
+warmup 1, repeat 2, VAD enabled:
 
-| Model | Device | RTF | Model load |
+| Model | Device | RTF | Model load | Peak used VRAM |
+| --- | --- | --- | --- | --- |
+| `small` | CPU (`int8`) | 0.077 | 0.87 s | n/a |
+| `small` | CUDA (`int8_float16`) | 0.038 | 1.07 s | ~2.0 GB total |
+| `medium` | CUDA (`int8_float16`) | 0.072 | 2.70 s | ~2.6 GB total |
+| `large-v3-turbo` | CUDA (`int8_float16`) | 0.027 | 2.79 s | ~2.6 GB total |
+
+For a 3-minute recording (the 61 s sample repeated to 180 s):
+
+| Model | Device | Time | RTF |
 | --- | --- | --- | --- |
-| `small` | CPU (`int8`) | 0.150 | 0.90 s |
-| `small` | CUDA (`int8_float16`) | 0.038 | 1.11 s |
-| `medium` | CUDA (`int8_float16`) | 0.067 | 3.18 s |
-| `large-v3-turbo` | CUDA (`int8_float16`) | 0.034 | 3.05 s |
+| `small` | CPU (`int8`) | 14.03 s | 0.078 |
+| `small` | CUDA (`int8_float16`) | 6.97 s | 0.039 |
+| `large-v3-turbo` | CUDA (`int8_float16`) | 4.16 s | 0.023 |
 
 The curated CUDA pack is 642.6 MB compressed (919.2 MB uncompressed) and was
 verified with `small`, `medium`, and `large-v3-turbo`. The PyInstaller application

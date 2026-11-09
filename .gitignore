@@ -9,7 +9,7 @@ dist-installer/
 models/
 .pytest_cache/
 .ruff_cache/
-tests/audio/*.wav
-tests/audio/*.json
+tests/audio/*
+!tests/audio/README.md
 bench-results.json
 *.log

@@ -164,31 +164,42 @@ Acceptance: overlay under 100 ms, focus preserved, settings apply live, single i
 
 ## 6. Test audio
 
-Expected files (provide 16 kHz, mono, PCM WAV):
+Files used locally (16 kHz, mono, PCM WAV):
 
-- `tests/audio/ru_60s.wav` — benchmark
-- `tests/audio/ru_3min.wav` — long-recording acceptance
+- `tests/audio/ru_60s.wav` — 60 s trim of a 61 s Russian recording
+- `tests/audio/ru_3min.wav` — the same recording repeated to 180 s
 
-`scripts/bench.py` accepts any WAV/audio file via `--audio`.
+The source recording is informal spontaneous Russian speech. Audio files are
+ignored by git. `scripts/bench.py` accepts any WAV/audio file via `--audio`.
 
 ## 7. Measured results
 
 Development machine: Intel Core i5-12500H (12 physical cores), NVIDIA GeForce
 RTX 4060 Laptop 8 GB, Windows 11, Python 3.12.
 
-Benchmark audio: 10.59 s English SAPI TTS (`tests/audio/tts_test.wav`), warmup 1,
-repeat 2. `RTF` is wall time divided by audio duration.
+Benchmark audio: 60.00 s of Russian speech, warmup 1, repeat 2, VAD enabled.
+`RTF` is wall time divided by audio duration.
 
 | Model | Device | Compute | Model load | RTF | Peak used VRAM |
 | --- | --- | --- | --- | --- | --- |
-| `small` | CPU | `int8` | 0.90 s | 0.150 | n/a |
-| `small` | CUDA | `int8_float16` | 1.11 s | 0.038 | ~1.9 GB total |
-| `medium` | CUDA | `int8_float16` | 3.18 s | 0.067 | ~2.5 GB total |
-| `large-v3-turbo` | CUDA | `int8_float16` | 3.05 s | 0.034 | ~2.6 GB total |
+| `small` | CPU | `int8` | 0.87 s | 0.077 | n/a |
+| `small` | CUDA | `int8_float16` | 1.07 s | 0.038 | ~2.0 GB total |
+| `medium` | CUDA | `int8_float16` | 2.70 s | 0.072 | ~2.6 GB total |
+| `large-v3-turbo` | CUDA | `int8_float16` | 2.79 s | 0.027 | ~2.6 GB total |
+
+3-minute recording (the 61 s sample repeated to 180 s), one measured run:
+
+| Model | Device | Time | RTF |
+| --- | --- | --- | --- |
+| `small` | CPU | 14.03 s | 0.078 |
+| `small` | CUDA | 6.97 s | 0.039 |
+| `large-v3-turbo` | CUDA | 4.16 s | 0.023 |
 
 Notes:
 
-- CUDA is roughly 4× faster than CPU on this machine for `small`.
+- CUDA is roughly 2× faster than CPU on this machine for `small` on 60 s audio.
+- `large-v3-turbo` produced the most accurate transcript of the spontaneous
+  speech sample; `small` made noticeably more word errors.
 - CUDA transcription was verified with the curated 7-DLL pack
   (`cublas64_12`, `cublasLt64_12`, `cudnn64_9`, `cudnn_cnn64_9`,
   `cudnn_graph64_9`, `cudnn_heuristic64_9`, `cudnn_ops64_9`).
