@@ -25,7 +25,7 @@ BUILD.mkdir(parents=True, exist_ok=True)
 # import pynput before pyi_rth_pyside6 imports PySide6 (see the file docstring).
 RUNTIME_HOOKS = [str(ROOT / "build_hooks" / "rthook_early.py")]
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 match = re.search(
     r'__version__\s*=\s*"([^"]+)"',
     (SRC / "voicetype" / "__init__.py").read_text(encoding="utf-8"),

@@ -76,6 +76,12 @@ The first GPU transcription may take a few seconds while the model is loaded.
 The overlay shows `Processing` while VoiceType is busy; new recordings are
 ignored until the current one is inserted.
 
+If no text field had focus when recognition finished, nothing is inserted and
+the recognized text stays on the clipboard. Click the intended input and press
+`Ctrl+V` to paste it. This fallback is enabled by **Keep the recognized text in
+the clipboard** in Settings; disable it if you prefer VoiceType to restore the
+previous clipboard content after every insertion.
+
 ### Modes
 
 - **Push-to-talk (hold)** — recording runs while the hotkey is held. Releasing
@@ -98,6 +104,7 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 | **Mode** | `Push-to-talk (hold)` records while the key is held and stops on release. `Toggle` starts recording on the first press and stops it on the second. |
 | **Language** | Recognition language: Russian, English, or `Auto`. Auto detects the language for every recording and can handle mixed speech, but it is slightly less predictable for short phrases. |
 | **Maximum recording** | Hard limit from 1 to 60 minutes (10 by default). Recording also stops when the hotkey is released in push-to-talk mode. Recordings shorter than 0.3 seconds are ignored. |
+| **Keep the recognized text in the clipboard** | When enabled (default), the last transcription stays on the clipboard, so if the paste target had no focus you can click the field and press `Ctrl+V`. Disable it to restore the previous clipboard content after each automatic insertion. |
 | **Device** | `Auto` uses CUDA when a usable NVIDIA GPU and the CUDA pack are available, otherwise the CPU. `CUDA (NVIDIA)` forces the GPU when possible and falls back to the CPU if CUDA cannot be initialized. `CPU` always uses the processor. |
 | **Model** | `Auto (recommended)` picks the best downloaded model for the current device. You can also pin `Base`, `Small`, `Medium`, or `Large v3 Turbo`. If the selected model has not been downloaded, VoiceType uses the best model that is available. |
 | **Unload model when idle** | Frees RAM and VRAM after the selected number of idle minutes (0–120, `Never` by default). The next recording reloads the model, which adds a short delay. |
@@ -243,10 +250,10 @@ Copy-Item -Recurse -Force models\small dist\VoiceType\models\small
 ### Build the installer
 
 ```powershell
-iscc /DMyAppVersion=0.1.2 installer\voicetype.iss
+iscc /DMyAppVersion=0.1.3 installer\voicetype.iss
 ```
 
-The result is written to `dist-installer\VoiceType-Setup-0.1.2.exe`.
+The result is written to `dist-installer\VoiceType-Setup-0.1.3.exe`.
 
 ### Build the CUDA pack
 
@@ -305,12 +312,13 @@ directory is 336.4 MB without models.
 - [ ] First run with no internet shows a clear error and opens Settings
 - [ ] Hotkey works in Notepad and in a browser text field
 - [ ] Text is inserted into the focused field; focus is not stolen by VoiceType
+- [ ] With no focused text field, the transcription remains on the clipboard and `Ctrl+V` pastes it
+- [ ] Disabling the clipboard fallback restores the previous clipboard content
 - [ ] A press shorter than 0.3 s is ignored
 - [ ] A 3-minute recording transcribes correctly and does not block the UI
 - [ ] New recordings are ignored while the overlay shows `Processing`
 - [ ] CPU mode works on a machine without an NVIDIA GPU
 - [ ] CUDA mode falls back to CPU if the CUDA pack is missing or broken
-- [ ] Clipboard content is restored after insertion
 - [ ] Autostart toggles survive a reboot / sign-out
 - [ ] Single instance: launching a second copy shows a message
 - [ ] Update check finds the latest release and verifies SHA-256
@@ -320,7 +328,9 @@ directory is 336.4 MB without models.
 
 - **No text is inserted.** Some elevated applications (for example Task Manager)
   reject synthetic input from a non-elevated app. Run VoiceType at the same
-  privilege level as the target application.
+  privilege level as the target application. If no input had focus at all, the
+  transcription is still on the clipboard: click the target field and press
+  `Ctrl+V`.
 - **The hotkey does nothing in a specific app.** Global hotkeys are captured at
   the system level; if another app registers the same combination, choose a
   different one.
@@ -351,5 +361,7 @@ for:
   Windows-specific).
 - Text insertion uses the clipboard and a synthetic `Ctrl+V`, so the target
   application must support pasting.
-- Plain-text clipboard contents are restored; other formats are not.
+- With the clipboard fallback enabled (default), the transcription replaces the
+  previous plain-text clipboard content. Disable the option to restore it after
+  each insertion; non-text clipboard formats are not preserved.
 - The application is not code-signed.

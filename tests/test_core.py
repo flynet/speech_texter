@@ -239,6 +239,59 @@ class TrayIconTests(unittest.TestCase):
         self.assertFalse(icon.pixmap(32, 32).isNull())
 
 
+class InserterClipboardTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
+    def setUp(self) -> None:
+        from PySide6.QtGui import QGuiApplication
+
+        self._clipboard = QGuiApplication.clipboard()
+        self._original = self._clipboard.text()
+
+    def tearDown(self) -> None:
+        self._clipboard.setText(self._original)
+
+    def _make_inserter(self, keep_text: bool):
+        from voicetype.inserter import Inserter
+
+        inserter = Inserter()
+        inserter._modifiers_down = staticmethod(lambda: False)
+        inserter._send_ctrl_v = staticmethod(lambda: True)
+        inserter.insert("recognized text", keep_text=keep_text)
+        inserter._timer.stop()
+        return inserter
+
+    def test_keeps_text_in_clipboard_when_enabled(self) -> None:
+        inserter = self._make_inserter(keep_text=True)
+        inserter._restore_and_finish()
+        self.assertEqual(self._clipboard.text(), "recognized text")
+
+    def test_restores_previous_clipboard_when_disabled(self) -> None:
+        self._clipboard.setText("previous clipboard")
+        inserter = self._make_inserter(keep_text=False)
+        inserter._restore_and_finish()
+        self.assertEqual(self._clipboard.text(), "previous clipboard")
+
+    def test_keeps_text_when_paste_cannot_be_sent(self) -> None:
+        from voicetype.inserter import Inserter
+
+        self._clipboard.setText("previous clipboard")
+        inserter = Inserter()
+        inserter._modifiers_down = staticmethod(lambda: False)
+        inserter._send_ctrl_v = staticmethod(lambda: False)
+        errors: list[str] = []
+        inserter.error.connect(errors.append)
+        inserter.insert("recognized text", keep_text=False)
+        inserter._poll_modifiers()
+        self.assertEqual(self._clipboard.text(), "recognized text")
+        self.assertTrue(errors)
+        self.assertIn("clipboard", errors[0])
+
+
 class HotkeyListenerTests(unittest.TestCase):
     """Exercise the Windows low-level filter without installing a hook."""
 

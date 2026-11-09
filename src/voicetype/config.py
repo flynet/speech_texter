@@ -95,6 +95,7 @@ class AppConfig:
     idle_unload_minutes: int = 0
     initial_prompt: str = ""
     overlay_position: str = "bottom-center"
+    keep_text_in_clipboard: bool = True
     hallucination_phrases: list[str] = field(
         default_factory=lambda: list(DEFAULT_HALLUCINATIONS)
     )
@@ -130,6 +131,7 @@ class AppConfig:
             self.hotkey = "ctrl+alt+space"
         if not isinstance(self.initial_prompt, str):
             self.initial_prompt = ""
+        self.keep_text_in_clipboard = bool(self.keep_text_in_clipboard)
 
     @classmethod
     def load(cls) -> "AppConfig":

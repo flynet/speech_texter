@@ -88,10 +88,11 @@ class Inserter(QObject):
         self._timer.timeout.connect(self._poll_modifiers)
         self._pending_text: str | None = None
         self._saved_text = ""
+        self._keep_text = True
         self._deadline = 0.0
         self._active = False
 
-    def insert(self, text: str) -> None:
+    def insert(self, text: str, keep_text: bool = True) -> None:
         if self._active:
             self.error.emit("Another insertion is already in progress.")
             return
@@ -100,6 +101,7 @@ class Inserter(QObject):
             return
         self._active = True
         self._pending_text = text
+        self._keep_text = keep_text
         self._saved_text = self._clipboard.text()
         self._clipboard.setText(text, QClipboard.Clipboard)
         self._deadline = time.monotonic() + 1.0
@@ -110,9 +112,14 @@ class Inserter(QObject):
             return
         self._timer.stop()
         if not self._send_ctrl_v():
-            self._restore_clipboard()
+            # Keep the recognized text in the clipboard even when automatic
+            # insertion fails, so the user can paste it manually.
+            self._pending_text = None
             self._active = False
-            self.error.emit("Could not send Ctrl+V to the active window.")
+            self.error.emit(
+                "Could not send Ctrl+V to the active window. "
+                "The recognized text is in the clipboard; press Ctrl+V to paste it."
+            )
             return
         QTimer.singleShot(250, self._restore_and_finish)
 
@@ -163,6 +170,11 @@ class Inserter(QObject):
         self._pending_text = None
 
     def _restore_and_finish(self) -> None:
-        self._restore_clipboard()
+        if self._keep_text:
+            # Leave the transcription on the clipboard: if the paste target
+            # had no focus, the user can press Ctrl+V manually.
+            self._pending_text = None
+        else:
+            self._restore_clipboard()
         self._active = False
         self.finished.emit()

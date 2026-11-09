@@ -279,7 +279,7 @@ class VoiceTypeApplication(QObject):
             log.info("Empty transcription; nothing to insert")
             self._finish_processing()
             return
-        self._inserter.insert(text)
+        self._inserter.insert(text, keep_text=self.config.keep_text_in_clipboard)
 
     def _on_transcription_error(self, message: str) -> None:
         self._set_error(message)

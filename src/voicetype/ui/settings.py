@@ -370,6 +370,20 @@ class SettingsWindow(QDialog):
         self._max_record_spin.setRange(1, 60)
         self._max_record_spin.setSuffix(" min")
         form.addRow("Maximum recording", self._max_record_spin)
+
+        self._keep_clipboard_check = QCheckBox(
+            "Keep the recognized text in the clipboard"
+        )
+        form.addRow("", self._keep_clipboard_check)
+
+        clipboard_hint = QLabel(
+            "If the text was not inserted automatically, click the target field "
+            "and press Ctrl+V. Disable this to restore the previous clipboard "
+            "content after each insertion."
+        )
+        clipboard_hint.setWordWrap(True)
+        clipboard_hint.setObjectName("muted")
+        form.addRow(clipboard_hint)
         return group
 
     def _build_model_group(self) -> QGroupBox:
@@ -501,6 +515,7 @@ class SettingsWindow(QDialog):
         self._set_combo_data(self._mode_combo, config.hotkey_mode)
         self._set_combo_data(self._language_combo, config.language)
         self._max_record_spin.setValue(max(1, config.max_record_seconds // 60))
+        self._keep_clipboard_check.setChecked(config.keep_text_in_clipboard)
         self._set_combo_data(self._device_combo, config.device)
         self._refresh_model_combo()
         self._prompt_edit.setPlainText(config.initial_prompt)
@@ -614,6 +629,7 @@ class SettingsWindow(QDialog):
             "autostart": self._autostart_check.isChecked(),
             "sounds": self._sounds_check.isChecked(),
             "max_record_seconds": self._max_record_spin.value() * 60,
+            "keep_text_in_clipboard": self._keep_clipboard_check.isChecked(),
             "idle_unload_minutes": self._idle_spin.value(),
             "initial_prompt": self._prompt_edit.toPlainText().strip(),
             "overlay_position": self._overlay_combo.currentData(),
