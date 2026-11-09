@@ -1,0 +1,55 @@
+name: CUDA pack
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cuda-pack
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build CUDA pack
+        run: python scripts/build_cuda_pack.py --output dist-cuda
+
+      - name: Remove an existing cuda-pack-v1 release
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete cuda-pack-v1 --yes --cleanup-tag
+
+      - name: Publish CUDA pack
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cuda-pack-v1
+          name: VoiceType CUDA pack v1
+          body: |
+            Optional CUDA acceleration pack for VoiceType.
+
+            Extract is performed automatically by the app into
+            `%LOCALAPPDATA%\VoiceType\cuda`. The archive is verified against
+            `SHA256SUMS.txt` before installation.
+
+            Contents:
+            - NVIDIA cuBLAS 12.9.2.10
+            - NVIDIA cuDNN 9.9.0.52
+          draft: false
+          prerelease: false
+          files: |
+            dist-cuda/voicetype-cuda-pack.zip
+            dist-cuda/SHA256SUMS.txt

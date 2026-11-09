@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+dist-cuda/
+dist-installer/
+models/
+.pytest_cache/
+.ruff_cache/
+tests/audio/*.wav
+tests/audio/*.json
+bench-results.json
+*.log
