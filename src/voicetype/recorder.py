@@ -102,6 +102,7 @@ class Recorder(QObject):
             audio = np.empty(0, dtype=np.float32)
         else:
             audio = np.concatenate(self._blocks).astype(np.float32, copy=False)
+            audio = audio.reshape(-1)
         self._blocks.clear()
         if len(audio) > self._max_frames > 0:
             audio = audio[: self._max_frames]
@@ -113,7 +114,7 @@ class Recorder(QObject):
             return
         if status:
             log.debug("Audio status: %s", status)
-        block = indata.copy()
+        block = indata[:, 0].copy() if indata.ndim > 1 else indata.copy()
         self._blocks.append(block)
         self._frames += frames
         if self._max_frames and self._frames >= self._max_frames and not self._limit_emitted:

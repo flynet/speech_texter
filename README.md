@@ -45,7 +45,7 @@ Choose **More info → Run anyway** after verifying the checksum.
 
 1. Open **Settings** from the tray icon.
 2. Click the hotkey field and press the desired combination (default:
-   `Ctrl+Alt+Space`).
+   `Ctrl+Alt+Space`). A single `F1`–`F24` key or `Space` can also be used.
 3. Choose the language and, optionally, a microphone.
 4. Click **Apply**.
 5. Focus any text field (Notepad, a browser, a chat app) and hold the hotkey.
@@ -65,11 +65,16 @@ ignored until the current one is inserted.
 Recordings shorter than 0.3 seconds are ignored. The maximum recording length is
 configurable (10 minutes by default).
 
+A single-key hotkey (for example `F5` or `Space`) is captured by VoiceType and
+does not reach the focused application. This also means that while `Space` is
+configured as the hotkey, VoiceType consumes Space presses system-wide — choose
+`Space` only if you do not need to type spaces elsewhere.
+
 ## Settings
 
 | Setting | Description |
 | --- | --- |
-| Hotkey | Global key combination with at least one modifier and one regular key |
+| Hotkey | Global key combination; use a modifier combination, or a single `F1`–`F24` / `Space` key |
 | Mode | Push-to-talk or toggle |
 | Language | Russian, English, or Auto |
 | Maximum recording | Automatic stop after the selected duration |
@@ -147,6 +152,9 @@ $env:PYTHONPATH = "src"
 .\.venv\Scripts\python.exe -m voicetype
 ```
 
+On Windows you can also double-click `run-test.cmd`, which starts the same
+source build and keeps the log visible in the console window.
+
 ### Build the application
 
 ```powershell
@@ -163,10 +171,10 @@ Copy-Item -Recurse -Force models\small dist\VoiceType\models\small
 ### Build the installer
 
 ```powershell
-iscc /DMyAppVersion=0.1.0 installer\voicetype.iss
+iscc /DMyAppVersion=0.1.1 installer\voicetype.iss
 ```
 
-The result is written to `dist-installer\VoiceType-Setup-0.1.0.exe`.
+The result is written to `dist-installer\VoiceType-Setup-0.1.1.exe`.
 
 ### Build the CUDA pack
 

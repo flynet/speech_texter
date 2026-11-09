@@ -25,7 +25,12 @@ from PySide6.QtWidgets import (
 
 from .. import __version__, cuda, hardware, models
 from ..config import AppConfig
-from ..hotkeys import format_hotkey, parse_hotkey, validate_hotkey
+from ..hotkeys import (
+    canonical_vk,
+    format_hotkey,
+    parse_hotkey,
+    validate_hotkey,
+)
 from ..recorder import Recorder
 
 log = logging.getLogger(__name__)
@@ -39,7 +44,7 @@ class HotkeyEdit(QLineEdit):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setReadOnly(True)
-        self.setPlaceholderText("Click and press a key combination")
+        self.setPlaceholderText("Click and press a key or combination")
         self._capturing = False
         self._modifiers: set[str] = set()
         self._old_text = ""
@@ -61,13 +66,31 @@ class HotkeyEdit(QLineEdit):
         self.setText(self._old_text)
         self.capture_finished.emit()
 
+    def is_capturing(self) -> bool:
+        return self._capturing
+
+    def finish_capture(self) -> None:
+        """End capture and keep the key text that is currently displayed.
+
+        Clicking Apply while the field is still capturing used to trigger a
+        focus-out cancel, which silently reverted the visible combination to
+        the previous value. Keeping the text lets Apply validate it and show a
+        clear message when the combination is incomplete.
+        """
+        if not self._capturing:
+            return
+        self._capturing = False
+        if self.text() == "Press keys...":
+            self.setText(self._old_text)
+        self.capture_finished.emit()
+
     def mousePressEvent(self, event) -> None:  # noqa: N802
         self.start_capture()
         event.accept()
 
     def focusOutEvent(self, event) -> None:  # noqa: N802
         if getattr(self, "_capturing", False):
-            self.cancel_capture()
+            self.finish_capture()
         super().focusOutEvent(event)
 
     def event(self, event) -> bool:  # noqa: N802
@@ -124,12 +147,22 @@ class HotkeyEdit(QLineEdit):
         combo = format_hotkey(keys)
         self.setText(combo)
         self._capturing = False
+        log.info("Hotkey captured: %s", combo)
         self.capture_finished.emit()
         self.captured.emit(combo)
         self.clearFocus()
 
     @staticmethod
     def _key_name(event) -> str | None:
+        # Prefer the Windows virtual-key code. It is layout independent, so a
+        # Russian layout still records the physical key ("q") instead of the
+        # Cyrillic character that key produces ("й"). The global listener
+        # matches virtual-key codes, so both sides must use the same names.
+        native_vk = int(getattr(event, "nativeVirtualKey", lambda: 0)() or 0)
+        if native_vk:
+            name = canonical_vk(native_vk)
+            if name is not None:
+                return name
         key = event.key()
         special = {
             Qt.Key_Space: "space",
@@ -313,6 +346,15 @@ class SettingsWindow(QDialog):
         self._hotkey_edit.capture_finished.connect(lambda: self._app.set_hotkey_capture(False))
         form.addRow("Hotkey", self._hotkey_edit)
 
+        hint = QLabel(
+            "Use a modifier combination (for example Ctrl+Alt+Space), or a single "
+            "F1-F24 / Space key. Single-key hotkeys are captured globally and are "
+            "not typed into the focused window."
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("muted")
+        form.addRow(hint)
+
         self._mode_combo = QComboBox()
         self._mode_combo.addItem("Push-to-talk (hold)", "hold")
         self._mode_combo.addItem("Toggle (press to start / stop)", "toggle")
@@ -450,11 +492,12 @@ class SettingsWindow(QDialog):
         self._config = self._app.config
         self._cuda_downloading = self._app.cuda_download_active
         config = self._config
-        try:
-            display = format_hotkey(parse_hotkey(config.hotkey))
-        except ValueError:
-            display = config.hotkey
-        self._hotkey_edit.setText(display)
+        if not self._hotkey_edit.is_capturing():
+            try:
+                display = format_hotkey(parse_hotkey(config.hotkey))
+            except ValueError:
+                display = config.hotkey
+            self._hotkey_edit.setText(display)
         self._set_combo_data(self._mode_combo, config.hotkey_mode)
         self._set_combo_data(self._language_combo, config.language)
         self._max_record_spin.setValue(max(1, config.max_record_seconds // 60))
@@ -540,6 +583,8 @@ class SettingsWindow(QDialog):
             self._app.download_cuda_pack()
 
     def apply(self) -> None:
+        if self._hotkey_edit.is_capturing():
+            self._hotkey_edit.finish_capture()
         raw_hotkey = self._hotkey_edit.text()
         if not raw_hotkey or raw_hotkey == "Press keys...":
             QMessageBox.warning(self, "Settings", "Please set a hotkey.")
@@ -547,8 +592,10 @@ class SettingsWindow(QDialog):
         try:
             keys = validate_hotkey(raw_hotkey)
         except ValueError as exc:
+            log.warning("Hotkey rejected: %r (%s)", raw_hotkey, exc)
             QMessageBox.warning(self, "Settings", str(exc))
             return
+        log.info("Applying settings with hotkey %s", format_hotkey(keys))
         model_key = str(self._model_combo.currentData())
         if model_key != "auto" and not models.is_available(model_key):
             QMessageBox.warning(
@@ -573,6 +620,10 @@ class SettingsWindow(QDialog):
         }
         if self._app.apply_settings(values):
             self.notify_saved()
+        else:
+            log.warning("Settings were not applied: %s", values)
+            self._status_label.setText("Settings were not saved.")
+            QTimer.singleShot(3000, lambda: self._status_label.setText(""))
 
     def notify_saved(self) -> None:
         self._status_label.setText("Settings saved.")

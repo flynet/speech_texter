@@ -216,6 +216,7 @@ class VoiceTypeApplication(QObject):
     # --------------------------------------------------------------- recording
 
     def _on_hotkey_pressed(self) -> None:
+        log.info("Hotkey pressed")
         if self._state in {"loading", "processing", "error"}:
             return
         if self._state == "recording":
@@ -227,6 +228,7 @@ class VoiceTypeApplication(QObject):
         self._start_recording()
 
     def _on_hotkey_released(self) -> None:
+        log.info("Hotkey released")
         if self.config.hotkey_mode == "hold" and self._state == "recording":
             self._stop_recording()
 

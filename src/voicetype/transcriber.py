@@ -138,6 +138,10 @@ class TranscriptionWorker(QObject):
         if not isinstance(audio, np.ndarray) or audio.size == 0:
             self.transcription_error.emit("No audio was recorded.")
             return
+        # faster-whisper requires a strictly 1D float32 array. The recorder
+        # already returns mono, so flattening here is lossless and protects
+        # against regressions such as an (N, 1) array.
+        audio = np.asarray(audio, dtype=np.float32).reshape(-1)
         if self._model is None:
             try:
                 if self._configured_model is None:
