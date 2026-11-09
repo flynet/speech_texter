@@ -18,6 +18,25 @@ CTranslate2.
 - Built-in updater verified with SHA-256
 - Single-instance application, per-user installer
 
+## Screenshots
+
+The main settings window. The first screen covers the hotkey and the speech
+model; the second shows audio, overlay, and system options.
+
+![VoiceType settings: dictation and speech model](docs/screenshots/settings-dictation.png)
+
+![VoiceType settings: audio, appearance, and system](docs/screenshots/settings-audio-system.png)
+
+The tray menu and the recording overlay that appears while the hotkey is held:
+
+<p>
+  <img src="docs/screenshots/tray-menu.png" alt="VoiceType tray menu" width="170">
+  <img src="docs/screenshots/recording-overlay.png" alt="VoiceType recording overlay" width="380">
+</p>
+
+Screenshots use demo values for the microphone and model list; on your system
+they reflect the devices and models that are actually available.
+
 ## Requirements
 
 - Windows 10 21H1 or newer, Windows 11 recommended (64-bit)
@@ -25,8 +44,9 @@ CTranslate2.
 - Any x64 CPU; an NVIDIA GPU is optional
 - Microphone
 
-GPU mode uses NVIDIA CUDA through CTranslate2. Without an NVIDIA GPU (or without
-the optional CUDA pack) VoiceType runs on the CPU automatically.
+GPU mode uses NVIDIA CUDA through CTranslate2. An NVIDIA GPU is optional: on
+any other hardware VoiceType runs on the CPU automatically. See
+[Hardware and CPU fallback](#hardware-and-cpu-fallback) for details.
 
 ## Install
 
@@ -72,21 +92,45 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 
 ## Settings
 
-| Setting | Description |
+| Setting | What it does |
 | --- | --- |
-| Hotkey | Global key combination; use a modifier combination, or a single `F1`–`F24` / `Space` key |
-| Mode | Push-to-talk or toggle |
-| Language | Russian, English, or Auto |
-| Maximum recording | Automatic stop after the selected duration |
-| Device | Auto, CUDA, or CPU |
-| Model | Auto, Base, Small, Medium, Large v3 Turbo |
-| Unload model when idle | Frees RAM/VRAM after a period of inactivity |
-| Initial prompt / vocabulary | Names and terms that improve recognition |
-| Microphone | Input device; the system default is used by default |
-| Sounds | Short start/stop tones |
-| Overlay position | Bottom center (default), bottom left, bottom right, top center |
-| Start with Windows | Adds an `HKCU\...\Run` entry |
-| CUDA pack | Download/remove GPU acceleration libraries |
+| **Hotkey** | Global combination that starts recording. Press a modifier combination (for example `Ctrl+Alt+Space`) or a single `F1`–`F24` / `Space` key. The hotkey works in every application and does not take focus away from the window you are typing in. |
+| **Mode** | `Push-to-talk (hold)` records while the key is held and stops on release. `Toggle` starts recording on the first press and stops it on the second. |
+| **Language** | Recognition language: Russian, English, or `Auto`. Auto detects the language for every recording and can handle mixed speech, but it is slightly less predictable for short phrases. |
+| **Maximum recording** | Hard limit from 1 to 60 minutes (10 by default). Recording also stops when the hotkey is released in push-to-talk mode. Recordings shorter than 0.3 seconds are ignored. |
+| **Device** | `Auto` uses CUDA when a usable NVIDIA GPU and the CUDA pack are available, otherwise the CPU. `CUDA (NVIDIA)` forces the GPU when possible and falls back to the CPU if CUDA cannot be initialized. `CPU` always uses the processor. |
+| **Model** | `Auto (recommended)` picks the best downloaded model for the current device. You can also pin `Base`, `Small`, `Medium`, or `Large v3 Turbo`. If the selected model has not been downloaded, VoiceType uses the best model that is available. |
+| **Unload model when idle** | Frees RAM and VRAM after the selected number of idle minutes (0–120, `Never` by default). The next recording reloads the model, which adds a short delay. |
+| **Models** | Model manager. `Small` is bundled with the installer and marked `Bundled`/`Installed`. Other models show `Not downloaded` with a **Download** button; an active download can be cancelled. |
+| **Initial prompt / vocabulary** | Optional text passed to Whisper before recognition. Add names, product terms, abbreviations, or unusual spellings to make them more likely to be recognized correctly. Keep it short; a long prompt may bias the output. |
+| **Microphone** | Input device. `System default` follows the Windows default device; choosing a specific microphone overrides it. **Refresh** re-scans the device list after connecting or disconnecting a microphone. |
+| **Sounds** | Plays a short tone when recording starts and a different one when it stops. |
+| **Overlay position** | Where the recording overlay appears: bottom center (default), bottom left, bottom right, or top center. The overlay ignores mouse input and never takes focus. |
+| **Start with Windows** | Adds or removes a per-user `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry. No administrator rights are required. |
+| **CUDA pack** | Available only when an NVIDIA GPU is detected; on other hardware Settings shows `No NVIDIA GPU detected. CPU mode will be used.` Downloads and verifies the optional cuBLAS/cuDNN libraries used for GPU acceleration; without it VoiceType stays on the CPU. |
+| **Check for updates** | Checks GitHub Releases, compares versions, downloads the installer, verifies its SHA-256 checksum, and runs the silent installer. Automatic checks are throttled to once per day. |
+
+Most changes take effect after pressing **Apply**. The hotkey can be changed
+while VoiceType is running; other settings may reload the model or restart audio
+capture.
+
+### How Auto chooses a device and model
+
+`Device = Auto` checks for an NVIDIA GPU, loadable CUDA libraries, and at least
+800 MB of free VRAM. If all three are present, CUDA is used; otherwise VoiceType
+uses the CPU and logs the reason (for example `No NVIDIA GPU detected`). The
+reason is also visible in the tray tooltip and the log file.
+
+`Model = Auto` then picks:
+
+- On CUDA with at least 1400 MB of free VRAM and a downloaded
+  `large-v3-turbo` — `large-v3-turbo`;
+- on CUDA otherwise — `small` if installed;
+- on CPU with 6 or more physical cores — `small`;
+- on slower CPUs — `base` if installed, otherwise `small`.
+
+The bundled `small` model makes CPU mode usable immediately after installation,
+without any download.
 
 ### Models
 
@@ -100,11 +144,39 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 Model files are downloaded directly from Hugging Face with pinned revisions.
 Downloads can be cancelled and are resumed at file granularity.
 
+## Hardware and CPU fallback
+
+VoiceType works on any 64-bit Windows machine with a modern x64 CPU. An NVIDIA
+GPU is an optional accelerator, not a requirement. Every faster-whisper model
+runs on the CPU through CTranslate2 with `int8` quantization; CUDA mode uses
+`int8_float16`.
+
+| Your hardware | What happens |
+| --- | --- |
+| **No discrete GPU** (Intel HD/UHD, AMD integrated graphics, or a headless VM) | CPU mode. No driver, CUDA, or extra setup is needed. |
+| **AMD Radeon** (any model) | CPU mode. CUDA is NVIDIA-only, so Radeon GPUs are not used for recognition, even with the CUDA pack installed. |
+| **Intel Arc** | CPU mode. Arc GPUs are not used by CTranslate2's CUDA backend and are treated like any other non-NVIDIA GPU. |
+| **NVIDIA GPU without the CUDA pack** | CPU mode until the **CUDA pack** is downloaded from Settings (or CUDA libraries are already installed system-wide). |
+| **NVIDIA GPU + CUDA pack, less than 800 MB free VRAM** | CPU mode to avoid out-of-memory errors. Close GPU-heavy applications and restart VoiceType to retry. |
+| **NVIDIA GPU + CUDA pack, enough free VRAM** | CUDA mode, which is significantly faster than the CPU. |
+| **CUDA initialization or transcription fails** | Automatic fallback to the CPU; the reason is shown in a tray notification and written to the log. |
+
+CPU speed depends on the processor, but it is fully functional for all four
+models. As a reference, `small` on an Intel Core i5-12500H runs at about
+0.077 RTF on the CPU — roughly 13 times faster than real time for this sample.
+Very old or low-power CPUs may run slower than real time with `medium` or
+`large-v3-turbo`; in that case use `base` or `small`.
+
+To force CPU mode at any time, set **Device** to **CPU**. This is also the
+quickest way to rule out a GPU problem when troubleshooting.
+
 ## GPU acceleration
 
 VoiceType detects NVIDIA GPUs automatically. The installer does **not** include
 CUDA libraries; instead, the app can download an optional CUDA pack
-(`cuda-pack-v1`) from GitHub Releases on first run or from Settings.
+(`cuda-pack-v1`) from GitHub Releases on first run or from Settings. AMD and
+Intel Arc GPUs are not used by this CUDA path; those systems always run on the
+CPU.
 
 - Default path: `%LOCALAPPDATA%\VoiceType\cuda`
 - The archive is verified against `SHA256SUMS.txt` before extraction
