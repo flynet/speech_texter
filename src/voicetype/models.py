@@ -16,8 +16,13 @@ log = logging.getLogger(__name__)
 
 USER_AGENT = f"VoiceType/{__version__}"
 
-HF_API_URL = "https://huggingface.co/api/models/{repo}?blobs=true"
+HF_API_URL = "https://huggingface.co/api/models/{repo}?blobs=true&revision={revision}"
 HF_RESOLVE_URL = "https://huggingface.co/{repo}/resolve/{revision}/{filename}"
+
+# Files faster-whisper needs to load a model without network access. Without
+# tokenizer.json, faster-whisper silently falls back to downloading a tokenizer
+# from openai/whisper-tiny on first use, which breaks offline operation.
+REQUIRED_MODEL_FILES = ("model.bin", "config.json", "tokenizer.json")
 
 
 @dataclass(frozen=True)
@@ -105,12 +110,16 @@ def model_dirs(key: str) -> list[Path]:
     return [cfg.bundled_models_dir() / key, cfg.models_dir() / key]
 
 
+def _is_model_complete(directory: Path) -> bool:
+    return all((directory / name).is_file() for name in REQUIRED_MODEL_FILES)
+
+
 def model_path(key: str, prefer_bundled: bool = True) -> Path | None:
     candidates = model_dirs(key)
     if not prefer_bundled:
         candidates = list(reversed(candidates))
     for path in candidates:
-        if (path / "model.bin").is_file() and (path / "config.json").is_file():
+        if _is_model_complete(path):
             return path
     return None
 
@@ -121,10 +130,10 @@ def is_available(key: str) -> bool:
 
 def model_status(key: str) -> str:
     bundled = cfg.bundled_models_dir() / key
-    if (bundled / "model.bin").is_file() and (bundled / "config.json").is_file():
+    if _is_model_complete(bundled):
         return "bundled"
     local = cfg.models_dir() / key
-    if (local / "model.bin").is_file() and (local / "config.json").is_file():
+    if _is_model_complete(local):
         return "downloaded"
     return "missing"
 
@@ -137,7 +146,7 @@ def _remote_files(info: ModelInfo) -> tuple[list[tuple[str, int]], int]:
     """Return files and total size from the Hugging Face API."""
     try:
         response = requests.get(
-            HF_API_URL.format(repo=info.repo_id),
+            HF_API_URL.format(repo=info.repo_id, revision=info.revision),
             headers={"User-Agent": USER_AGENT},
             timeout=20,
         )
@@ -249,7 +258,7 @@ def download_model(
             cancel=cancel,
         )
 
-    if not (dest / "model.bin").is_file() or not (dest / "config.json").is_file():
+    if not _is_model_complete(dest):
         raise RuntimeError(f"Model download for {key} is incomplete")
 
     if progress is not None:

@@ -84,6 +84,11 @@ class OverlayWindow(QWidget):
             self._fade.setStartValue(0.0)
             self._fade.setEndValue(1.0)
             self._fade.start()
+        else:
+            # hide_overlay() starts a fade-out. A new state can arrive before it
+            # finishes (a fast second press); cancel the pending hide so the
+            # overlay does not disappear while recording.
+            self._cancel_pending_hide()
         self._phase = 0.0
         if state in {"recording", "processing"}:
             self._timer.start()
@@ -101,6 +106,11 @@ class OverlayWindow(QWidget):
         self._fade.setStartValue(self.windowOpacity())
         self._fade.setEndValue(0.0)
         self._fade.start()
+
+    def _cancel_pending_hide(self) -> None:
+        self._fade.stop()
+        self._hide_after_fade = False
+        self.setWindowOpacity(1.0)
 
     def set_level(self, rms: float) -> None:
         value = min(1.0, max(0.0, rms * 10.0))
