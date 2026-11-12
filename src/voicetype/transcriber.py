@@ -53,7 +53,7 @@ class TranscriptionWorker(QObject):
         self._blacklist: list[str] = []
         self._cuda_failure: str | None = None
 
-    @Slot(str, str, str, str, object)
+    @Slot(str, str, str, str, object, bool)
     def configure(
         self,
         model_key: str,
@@ -61,11 +61,16 @@ class TranscriptionWorker(QObject):
         language: str,
         prompt: str,
         blacklist: object,
+        retry_cuda: bool = False,
     ) -> None:
         self._language = language
         self._prompt = prompt
         if isinstance(blacklist, list):
             self._blacklist = [str(item) for item in blacklist]
+        if retry_cuda:
+            # The user explicitly requested CUDA again. A previous failure may
+            # have been transient (for example, not enough free VRAM).
+            self._cuda_failure = None
         self._configured_model = model_key
         self._configured_device = device
         if (
@@ -216,5 +221,10 @@ class TranscriptionWorker(QObject):
         log.info("Speech model unloaded")
         self.model_unloaded.emit()
 
-    def reset_cuda_failure(self) -> None:
-        self._cuda_failure = None
+    @Slot()
+    def quit_thread(self) -> None:
+        # QThread.quit() must run inside the worker thread, so it is invoked
+        # through this queued slot instead of being called from the GUI thread.
+        thread = self.thread()
+        if thread is not None:
+            thread.quit()

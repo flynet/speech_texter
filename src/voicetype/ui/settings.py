@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import QEvent, QTimer, Qt, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -32,6 +33,7 @@ from ..hotkeys import (
     validate_hotkey,
 )
 from ..recorder import Recorder
+from ..testbench import RecognitionTester
 
 log = logging.getLogger(__name__)
 
@@ -305,6 +307,7 @@ class SettingsWindow(QDialog):
         layout.addWidget(self._build_dictation_group())
         layout.addWidget(self._build_model_group())
         layout.addWidget(self._build_audio_group())
+        layout.addWidget(self._build_test_group())
         layout.addWidget(self._build_appearance_group())
         layout.addWidget(self._build_system_group())
         layout.addWidget(self._build_about_group())
@@ -330,6 +333,22 @@ class SettingsWindow(QDialog):
         self._app.model_download_finished.connect(self._on_model_finished)
         self._app.cuda_progress.connect(self._on_cuda_progress)
         self._app.cuda_finished.connect(self._on_cuda_finished)
+
+        self._tester = RecognitionTester(self)
+        self._tester.state_changed.connect(self._on_test_state)
+        self._tester.status_changed.connect(self._on_test_status)
+        self._tester.level_changed.connect(self._on_test_level)
+        self._tester.elapsed_changed.connect(self._on_test_elapsed)
+        self._tester.result_ready.connect(self._on_test_result)
+        self._tester.error.connect(self._on_test_error)
+        self._test_controls = [
+            self._model_combo,
+            self._device_combo,
+            self._language_combo,
+            self._mic_combo,
+            self._mic_refresh_button,
+            self._prompt_edit,
+        ]
 
         self.refresh()
 
@@ -443,14 +462,83 @@ class SettingsWindow(QDialog):
         mic_layout.setSpacing(6)
         self._mic_combo = QComboBox()
         mic_layout.addWidget(self._mic_combo, 1)
-        refresh = QPushButton("Refresh")
-        refresh.setFixedWidth(80)
-        refresh.clicked.connect(self._refresh_mics)
-        mic_layout.addWidget(refresh)
+        self._mic_refresh_button = QPushButton("Refresh")
+        self._mic_refresh_button.setFixedWidth(80)
+        self._mic_refresh_button.clicked.connect(self._refresh_mics)
+        mic_layout.addWidget(self._mic_refresh_button)
         form.addRow("Microphone", mic_row)
 
         self._sounds_check = QCheckBox("Play a sound when recording starts and stops")
         form.addRow("", self._sounds_check)
+        return group
+
+    def _build_test_group(self) -> QGroupBox:
+        group = QGroupBox("Test model and microphone")
+        layout = QVBoxLayout(group)
+        layout.setSpacing(8)
+
+        hint = QLabel(
+            "Press Start, say a short phrase, then press Stop to see the "
+            "recognized text. The test uses the values selected above without "
+            "saving them, so you can compare models freely."
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("muted")
+        layout.addWidget(hint)
+
+        self._test_profile = QLabel("")
+        self._test_profile.setObjectName("muted")
+        self._test_profile.setWordWrap(True)
+        layout.addWidget(self._test_profile)
+
+        controls = QHBoxLayout()
+        self._test_button = QPushButton("Start test")
+        self._test_button.setMinimumWidth(150)
+        self._test_button.clicked.connect(self._on_test_button)
+        controls.addWidget(self._test_button)
+        self._test_status = QLabel("Ready.")
+        self._test_status.setObjectName("muted")
+        self._test_status.setWordWrap(True)
+        controls.addWidget(self._test_status, 1)
+        layout.addLayout(controls)
+
+        self._test_level = QProgressBar()
+        self._test_level.setRange(0, 100)
+        self._test_level.setTextVisible(False)
+        self._test_level.setFixedHeight(10)
+        self._test_level.setVisible(False)
+        layout.addWidget(self._test_level)
+
+        result_label = QLabel("Recognized text")
+        result_label.setObjectName("muted")
+        layout.addWidget(result_label)
+
+        self._test_text = QPlainTextEdit()
+        self._test_text.setReadOnly(True)
+        self._test_text.setPlaceholderText("Your recognized text will appear here.")
+        self._test_text.setFixedHeight(92)
+        layout.addWidget(self._test_text)
+
+        footer = QHBoxLayout()
+        self._test_meta = QLabel("Not tested yet.")
+        self._test_meta.setObjectName("muted")
+        self._test_meta.setWordWrap(True)
+        footer.addWidget(self._test_meta, 1)
+        self._test_copy = QPushButton("Copy")
+        self._test_copy.setFixedWidth(70)
+        self._test_copy.setEnabled(False)
+        self._test_copy.clicked.connect(self._copy_test_text)
+        self._test_clear = QPushButton("Clear")
+        self._test_clear.setFixedWidth(70)
+        self._test_clear.setEnabled(False)
+        self._test_clear.clicked.connect(self._clear_test_result)
+        footer.addWidget(self._test_copy)
+        footer.addWidget(self._test_clear)
+        layout.addLayout(footer)
+
+        self._model_combo.currentIndexChanged.connect(self._update_test_profile)
+        self._device_combo.currentIndexChanged.connect(self._update_test_profile)
+        self._mic_combo.currentIndexChanged.connect(self._update_test_profile)
         return group
 
     def _build_appearance_group(self) -> QGroupBox:
@@ -502,6 +590,134 @@ class SettingsWindow(QDialog):
         layout.addWidget(self._update_status)
         return group
 
+    def _update_test_profile(self) -> None:
+        model_key = self._model_combo.currentData()
+        if not model_key or model_key == "auto":
+            model_name = "Auto (best available)"
+        else:
+            info = models.MODELS.get(model_key)
+            model_name = info.display_name if info is not None else str(model_key)
+            if not models.is_available(model_key):
+                model_name += " (not downloaded)"
+        device = {"auto": "Auto", "cuda": "CUDA", "cpu": "CPU"}.get(
+            str(self._device_combo.currentData()), "Auto"
+        )
+        microphone = self._mic_combo.currentText() or "System default"
+        self._test_profile.setText(
+            f"Will test: {model_name} · {device} · {microphone}"
+        )
+
+    def _on_test_button(self) -> None:
+        if self._tester.state == "recording":
+            self._tester.stop()
+            return
+        if self._tester.state == "processing":
+            return
+        if self._app.is_busy:
+            self._set_test_status(
+                "Wait for the current recording or model load to finish.",
+                error=True,
+            )
+            return
+        model_key = self._model_combo.currentData()
+        if model_key != "auto" and not models.is_available(model_key):
+            self._set_test_status(
+                "The selected model is not downloaded. Download it first.",
+                error=True,
+            )
+            return
+        self._test_text.clear()
+        self._test_meta.setText("Working…")
+        self._test_copy.setEnabled(False)
+        self._test_clear.setEnabled(False)
+        self._app.set_hotkey_capture(True)
+        started = self._tester.start(
+            str(model_key),
+            str(self._device_combo.currentData()),
+            str(self._language_combo.currentData()),
+            self._prompt_edit.toPlainText().strip(),
+            self._mic_combo.currentData() or None,
+            list(self._app.config.hallucination_phrases),
+        )
+        if not started:
+            self._app.set_hotkey_capture(False)
+
+    def _on_test_state(self, state: str) -> None:
+        active = state in {"recording", "processing"}
+        self._apply_button.setEnabled(not active)
+        for widget in self._test_controls:
+            widget.setEnabled(not active)
+        if state == "recording":
+            self._test_button.setText("Stop and recognize")
+            self._test_button.setEnabled(True)
+            self._test_level.setVisible(True)
+            self._app.set_hotkey_capture(True)
+        elif state == "processing":
+            self._test_button.setText("Recognizing…")
+            self._test_button.setEnabled(False)
+            self._test_level.setVisible(False)
+        elif state == "done":
+            self._test_button.setText("Test again")
+            self._test_button.setEnabled(True)
+            self._test_level.setVisible(False)
+            self._app.set_hotkey_capture(False)
+        elif state == "error":
+            self._test_button.setText("Try again")
+            self._test_button.setEnabled(True)
+            self._test_level.setVisible(False)
+            self._app.set_hotkey_capture(False)
+        else:
+            self._test_button.setText("Start test")
+            self._test_button.setEnabled(True)
+            self._test_level.setVisible(False)
+            self._app.set_hotkey_capture(False)
+
+    def _on_test_status(self, message: str) -> None:
+        self._set_test_status(message, error=self._tester.state == "error")
+
+    def _on_test_error(self, message: str) -> None:
+        self._set_test_status(message, error=True)
+        if not self._test_text.toPlainText():
+            self._test_meta.setText("Not tested yet.")
+        self._app.set_hotkey_capture(False)
+
+    def _on_test_level(self, level: float) -> None:
+        self._test_level.setValue(int(max(0.0, min(1.0, level)) * 100))
+
+    def _on_test_elapsed(self, elapsed: float) -> None:
+        if self._tester.state == "recording":
+            self._set_test_status(f"Recording… {elapsed:.1f} s — speak now")
+
+    def _on_test_result(self, text: str, meta: str) -> None:
+        self._test_text.setPlainText(text)
+        self._test_meta.setText(meta)
+        self._test_meta.setToolTip(self._tester.selection_reason)
+        self._test_copy.setEnabled(bool(text))
+        self._test_clear.setEnabled(True)
+
+    def _set_test_status(self, message: str, error: bool = False) -> None:
+        self._test_status.setText(message)
+        self._test_status.setObjectName("error" if error else "muted")
+        self._test_status.style().unpolish(self._test_status)
+        self._test_status.style().polish(self._test_status)
+
+    def _copy_test_text(self) -> None:
+        text = self._test_text.toPlainText()
+        if not text:
+            return
+        QGuiApplication.clipboard().setText(text)
+        self._set_test_status("Copied to the clipboard.")
+
+    def _clear_test_result(self) -> None:
+        if self._tester.state in {"recording", "processing"}:
+            return
+        self._test_text.clear()
+        self._test_meta.setText("Not tested yet.")
+        self._test_meta.setToolTip("")
+        self._test_copy.setEnabled(False)
+        self._test_clear.setEnabled(False)
+        self._set_test_status("Ready.")
+
     def refresh(self) -> None:
         self._config = self._app.config
         self._cuda_downloading = self._app.cuda_download_active
@@ -532,6 +748,7 @@ class SettingsWindow(QDialog):
             if row is not None:
                 row.set_downloading(True)
         self._refresh_cuda()
+        self._update_test_profile()
 
     def _set_combo_data(self, combo: QComboBox, value) -> None:
         index = combo.findData(value)
@@ -548,6 +765,7 @@ class SettingsWindow(QDialog):
             self._model_combo.addItem(info.display_name + suffix, key)
         self._set_combo_data(self._model_combo, self._config.model)
         self._model_combo.blockSignals(False)
+        self._update_test_profile()
 
     def _refresh_mics(self) -> None:
         current = self._config.microphone or ""
@@ -558,6 +776,7 @@ class SettingsWindow(QDialog):
             self._mic_combo.addItem(name, name)
         self._set_combo_data(self._mic_combo, current)
         self._mic_combo.blockSignals(False)
+        self._update_test_profile()
 
     def _refresh_cuda(self) -> None:
         gpus = hardware.detect_nvidia_gpus()
@@ -598,6 +817,8 @@ class SettingsWindow(QDialog):
             self._app.download_cuda_pack()
 
     def apply(self) -> None:
+        if self._tester.state in {"recording", "processing"}:
+            return
         if self._hotkey_edit.is_capturing():
             self._hotkey_edit.finish_capture()
         raw_hotkey = self._hotkey_edit.text()
@@ -619,6 +840,8 @@ class SettingsWindow(QDialog):
                 "The selected model is not downloaded yet. Download it first or choose Auto.",
             )
             return
+        # Free the test model before the main worker loads the new profile.
+        self._tester.unload()
         values = {
             "hotkey": format_hotkey(keys),
             "hotkey_mode": self._mode_combo.currentData(),
@@ -691,6 +914,17 @@ class SettingsWindow(QDialog):
     def showEvent(self, event) -> None:  # noqa: N802
         self.refresh()
         super().showEvent(event)
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        tester = getattr(self, "_tester", None)
+        if tester is not None:
+            tester.on_hide()
+        super().hideEvent(event)
+
+    def shutdown(self) -> None:
+        tester = getattr(self, "_tester", None)
+        if tester is not None:
+            tester.shutdown()
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._hotkey_edit._capturing:

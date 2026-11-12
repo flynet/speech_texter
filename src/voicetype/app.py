@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 
 class VoiceTypeApplication(QObject):
-    configure_worker = Signal(str, str, str, str, object)
+    configure_worker = Signal(str, str, str, str, object, bool)
     transcribe_requested = Signal(object)
     unload_requested = Signal()
 
@@ -140,7 +140,7 @@ class VoiceTypeApplication(QObject):
 
     # ------------------------------------------------------------------ model
 
-    def _configure_from_config(self) -> None:
+    def _configure_from_config(self, retry_cuda: bool = False) -> None:
         try:
             selection = hardware.resolve_selection(self.config.model, self.config.device)
         except hardware.NoModelsAvailable as exc:
@@ -167,6 +167,7 @@ class VoiceTypeApplication(QObject):
             self.config.language,
             self.config.initial_prompt,
             self.config.hallucination_phrases,
+            retry_cuda or self.config.device == "cuda",
         )
 
     def _on_model_loading(self, model_key: str, device: str) -> None:
@@ -297,6 +298,10 @@ class VoiceTypeApplication(QObject):
             return self._selection.device.upper()
         return ""
 
+    @property
+    def is_busy(self) -> bool:
+        return self._state in {"loading", "recording", "processing"}
+
     def _finish_processing(self) -> None:
         if self._recording:
             return
@@ -399,6 +404,7 @@ class VoiceTypeApplication(QObject):
                 self.config.language,
                 self.config.initial_prompt,
                 self.config.hallucination_phrases,
+                False,
             )
 
     def _on_tray_autostart(self, enabled: bool) -> None:
@@ -723,5 +729,6 @@ class VoiceTypeApplication(QObject):
             self._worker_thread.terminate()
             self._worker_thread.wait(1000)
         if self._settings is not None:
+            self._settings.shutdown()
             self._settings.hide()
         self._tray.hide()
