@@ -6,10 +6,6 @@ that currently has focus. Audio never leaves the machine: recognition runs
 locally with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and
 CTranslate2.
 
-The story in one picture: press the hotkey, speak, and the recognized text lands
-in the window you are typing in — Russian and English with a custom dictionary,
-CPU-friendly, no admin rights, and audio never leaves the PC.
-
 ![VoiceType story: when typing is lazy, Ctrl+Alt+Space dictation inserts the recognized text into any window; Russian and English with a custom dictionary, and audio never leaves the PC](docs/story.png)
 
 ## Features
