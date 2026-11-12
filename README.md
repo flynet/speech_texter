@@ -13,6 +13,9 @@ CTranslate2.
 - Automatic GPU detection with a safe CPU fallback
 - Tray icon, no main window, and a small always-on-top recording overlay
 - Model manager: `base`, `small`, `medium`, and `large-v3-turbo`
+- Built-in test bench in Settings: record a short sample with the currently
+  selected model, device, and microphone without saving them, so models and
+  microphones can be compared before applying
 - Optional CUDA acceleration pack downloaded separately from GitHub Releases
 - Optional autostart, notification sounds, initial prompt, idle model unload
 - Built-in updater verified with SHA-256
@@ -25,7 +28,7 @@ model; the second shows audio, overlay, and system options.
 
 ![VoiceType settings: dictation and speech model](docs/screenshots/settings-dictation.png)
 
-![VoiceType settings: audio, appearance, and system](docs/screenshots/settings-audio-system.png)
+![VoiceType settings: audio, test bench, appearance, and system](docs/screenshots/settings-audio-system.png)
 
 The tray menu and the recording overlay that appears while the hotkey is held:
 
@@ -111,6 +114,7 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 | **Models** | Model manager. `Small` is bundled with the installer and marked `Bundled`/`Installed`. Other models show `Not downloaded` with a **Download** button; an active download can be cancelled. |
 | **Initial prompt / vocabulary** | Optional text passed to Whisper before recognition. Add names, product terms, abbreviations, or unusual spellings to make them more likely to be recognized correctly. Keep it short; a long prompt may bias the output. |
 | **Microphone** | Input device. `System default` follows the Windows default device; choosing a specific microphone overrides it. **Refresh** re-scans the device list after connecting or disconnecting a microphone. |
+| **Test model and microphone** | A demo bench next to the microphone selector. Press **Start test**, speak for up to 30 seconds, press **Stop and recognize**: the recognized text appears with the model, device, microphone, duration and RTF of that run. It uses the values selected above **without saving them**, so you can compare models and microphones freely, then press **Apply** once at the end. Global hotkeys are paused while testing, and the main dictation pipeline is left untouched. |
 | **Sounds** | Plays a short tone when recording starts and a different one when it stops. |
 | **Overlay position** | Where the recording overlay appears: bottom center (default), bottom left, bottom right, or top center. The overlay ignores mouse input and never takes focus. |
 | **Start with Windows** | Adds or removes a per-user `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry. No administrator rights are required. |
@@ -250,10 +254,10 @@ Copy-Item -Recurse -Force models\small dist\VoiceType\models\small
 ### Build the installer
 
 ```powershell
-iscc /DMyAppVersion=0.1.3 installer\voicetype.iss
+iscc /DMyAppVersion=0.2.0 installer\voicetype.iss
 ```
 
-The result is written to `dist-installer\VoiceType-Setup-0.1.3.exe`.
+The result is written to `dist-installer\VoiceType-Setup-0.2.0.exe`.
 
 ### Build the CUDA pack
 

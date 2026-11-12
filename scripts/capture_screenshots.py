@@ -104,6 +104,19 @@ def _prepare_demo_environment() -> None:
     )
 
 
+def _decorate_test_group(window: SettingsWindow) -> None:
+    """Fill the test group with a completed demo result for the screenshot."""
+    window._test_status.setText("Test complete.")
+    window._test_text.setPlainText(
+        "Проверка модели и микрофона: речь распознана полностью."
+    )
+    window._test_meta.setText(
+        "Small (base.en) · CPU · Microphone (USB Audio Device) · 3.4 s · RTF 0.48"
+    )
+    window._test_copy.setEnabled(True)
+    window._test_clear.setEnabled(True)
+
+
 def _settings_screenshots(app: QApplication) -> None:
     window = SettingsWindow(DemoApplication())
     window.resize(660, 860)
@@ -119,10 +132,12 @@ def _settings_screenshots(app: QApplication) -> None:
             (group for group in window.findChildren(QGroupBox) if group.title() == "Audio"),
             None,
         )
+        _decorate_test_group(window)
         bar.setValue(audio.y() - 12 if audio is not None else bar.maximum())
         QTest.qWait(250)
         window.grab().save(str(OUTPUT / "settings-audio-system.png"), "PNG")
 
+    window.shutdown()
     window.close()
     QTest.qWait(100)
 

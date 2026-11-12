@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -11,7 +13,7 @@ import numpy as np  # noqa: E402
 
 import voicetype  # noqa: E402,F401
 from voicetype import models  # noqa: E402
-from voicetype.config import AppConfig  # noqa: E402
+from voicetype.config import DEFAULT_HALLUCINATIONS, AppConfig  # noqa: E402
 from voicetype.hotkeys import (  # noqa: E402
     canonical_vk,
     format_hotkey,
@@ -435,13 +437,19 @@ class TranscriberTests(unittest.TestCase):
 
 class CleanTextTests(unittest.TestCase):
     def test_whitespace(self) -> None:
-        self.assertEqual(clean_text("  РїСЂРёРІРµС‚   РјРёСЂ \n", []), "РїСЂРёРІРµС‚ РјРёСЂ")
+        self.assertEqual(clean_text("  привет   мир \n", []), "привет мир")
 
     def test_hallucinations(self) -> None:
-        phrases = ["РџСЂРѕРґРѕР»Р¶РµРЅРёРµ СЃР»РµРґСѓРµС‚...", "РЎРїР°СЃРёР±Рѕ Р·Р° РїСЂРѕСЃРјРѕС‚СЂ!"]
-        self.assertEqual(clean_text("РџСЂРѕРґРѕР»Р¶РµРЅРёРµ СЃР»РµРґСѓРµС‚...", phrases), "")
-        self.assertEqual(clean_text("РЎРїР°СЃРёР±Рѕ Р·Р° РїСЂРѕСЃРјРѕС‚СЂ!", phrases), "")
-        self.assertEqual(clean_text("РџСЂРѕРґРѕР»Р¶РµРЅРёРµ СЃР»РµРґСѓРµС‚", phrases), "")
+        phrases = list(DEFAULT_HALLUCINATIONS)
+        self.assertEqual(clean_text("Продолжение следует...", phrases), "")
+        self.assertEqual(clean_text("Спасибо за просмотр!", phrases), "")
+        self.assertEqual(clean_text("Продолжение следует", phrases), "")
+
+    def test_all_default_hallucinations_are_dropped(self) -> None:
+        phrases = list(DEFAULT_HALLUCINATIONS)
+        for phrase in phrases:
+            with self.subTest(phrase=phrase):
+                self.assertEqual(clean_text(phrase, phrases), "")
 
     def test_punctuation_only(self) -> None:
         self.assertEqual(clean_text("...", []), "")
@@ -491,6 +499,147 @@ class ModelRegistryTests(unittest.TestCase):
             self.assertEqual(len(info.revision), 40)
             self.assertIn("model.bin", dict(info.fallback_files))
             self.assertIn("config.json", dict(info.fallback_files))
+            self.assertIn("tokenizer.json", dict(info.fallback_files))
+
+
+class ModelCompletenessTests(unittest.TestCase):
+    @staticmethod
+    def _write(directory: Path, *names: str) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            (directory / name).write_bytes(b"test")
+
+    def _patch_dirs(self, local: Path, bundled: Path):
+        return (
+            mock.patch.object(models.cfg, "models_dir", return_value=local),
+            mock.patch.object(models.cfg, "bundled_models_dir", return_value=bundled),
+        )
+
+    def test_partial_download_is_not_installed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local = root / "local"
+            bundled = root / "bundled"
+            self._write(local / "small", "model.bin", "config.json")
+            local_patch, bundled_patch = self._patch_dirs(local, bundled)
+            with local_patch, bundled_patch:
+                self.assertIsNone(models.model_path("small"))
+                self.assertEqual(models.model_status("small"), "missing")
+                self.assertFalse(models.is_available("small"))
+
+    def test_complete_download_is_installed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local = root / "local"
+            bundled = root / "bundled"
+            self._write(local / "small", *models.REQUIRED_MODEL_FILES)
+            local_patch, bundled_patch = self._patch_dirs(local, bundled)
+            with local_patch, bundled_patch:
+                self.assertEqual(models.model_path("small"), local / "small")
+                self.assertEqual(models.model_status("small"), "downloaded")
+                self.assertTrue(models.is_available("small"))
+
+    def test_bundled_model_takes_precedence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local = root / "local"
+            bundled = root / "bundled"
+            self._write(local / "small", *models.REQUIRED_MODEL_FILES)
+            self._write(bundled / "small", *models.REQUIRED_MODEL_FILES)
+            local_patch, bundled_patch = self._patch_dirs(local, bundled)
+            with local_patch, bundled_patch:
+                self.assertEqual(models.model_path("small"), bundled / "small")
+                self.assertEqual(models.model_status("small"), "bundled")
+
+
+class ModelRemoteFilesTests(unittest.TestCase):
+    def test_file_list_is_requested_for_pinned_revision(self) -> None:
+        info = models.MODELS["small"]
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "siblings": [{"rfilename": "model.bin", "size": 123}]
+        }
+        with mock.patch.object(models.requests, "get", return_value=response) as get:
+            files, total = models._remote_files(info)
+        url = get.call_args.args[0]
+        self.assertIn(f"revision={info.revision}", url)
+        self.assertEqual(files, [("model.bin", 123)])
+        self.assertEqual(total, 123)
+
+
+class CudaRetryTests(unittest.TestCase):
+    def test_explicit_cuda_retry_clears_previous_failure(self) -> None:
+        from voicetype.transcriber import TranscriptionWorker
+
+        worker = TranscriptionWorker()
+        worker._cuda_failure = "CUDA out of memory"
+        self.assertEqual(worker._effective_device("cuda"), "cpu")
+        loaded: list[tuple[str, str]] = []
+        worker._load = lambda model_key, device: loaded.append((model_key, device))
+
+        worker.configure("small", "cuda", "ru", "", [], True)
+
+        self.assertIsNone(worker._cuda_failure)
+        self.assertEqual(loaded, [("small", "cuda")])
+
+    def test_configure_without_retry_keeps_failure(self) -> None:
+        from voicetype.transcriber import TranscriptionWorker
+
+        worker = TranscriptionWorker()
+        worker._cuda_failure = "CUDA out of memory"
+        worker._load = lambda model_key, device: None
+
+        worker.configure("small", "cuda", "ru", "", [], False)
+
+        self.assertEqual(worker._cuda_failure, "CUDA out of memory")
+
+
+class OverlayFadeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_cancel_pending_hide(self) -> None:
+        from voicetype.ui.overlay import OverlayWindow
+
+        overlay = OverlayWindow()
+        overlay._hide_after_fade = True
+        overlay._cancel_pending_hide()
+        self.assertFalse(overlay._hide_after_fade)
+        self.assertAlmostEqual(overlay.windowOpacity(), 1.0)
+        overlay.deleteLater()
+
+
+class RecognitionTestValidationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_missing_microphone_is_rejected(self) -> None:
+        from voicetype.testbench import RecognitionTester
+
+        tester = RecognitionTester()
+        errors: list[str] = []
+        tester.error.connect(errors.append)
+        try:
+            started = tester.start(
+                "small",
+                "cpu",
+                "ru",
+                "",
+                "VoiceType microphone that does not exist",
+                [],
+            )
+        finally:
+            tester.shutdown()
+        self.assertFalse(started)
+        self.assertEqual(tester.state, "error")
+        self.assertTrue(errors)
 
 
 if __name__ == "__main__":
