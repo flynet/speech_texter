@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -640,6 +641,73 @@ class RecognitionTestValidationTests(unittest.TestCase):
         self.assertFalse(started)
         self.assertEqual(tester.state, "error")
         self.assertTrue(errors)
+
+
+class HelpButtonTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_the_help_button_opens_the_repo_issues_page(self) -> None:
+        from PySide6.QtWidgets import QPushButton
+
+        from voicetype import cuda, hardware, models
+        from voicetype.recorder import Recorder
+        from voicetype.ui import settings
+
+        self.assertEqual(
+            settings.ISSUES_URL, "https://github.com/flynet/speech_texter/issues"
+        )
+
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from capture_screenshots import DemoApplication
+
+        opened: list[str] = []
+        fake_desktop = SimpleNamespace(
+            openUrl=lambda url: opened.append(url.toString()) or True
+        )
+        with mock.patch.object(models, "is_available", lambda key: key == "small"), \
+            mock.patch.object(
+                models,
+                "model_status",
+                lambda key: "bundled" if key == "small" else "missing",
+            ), \
+            mock.patch.object(hardware, "detect_nvidia_gpus", lambda: []), \
+            mock.patch.object(hardware, "cuda_available", lambda: False), \
+            mock.patch.object(cuda, "cuda_pack_installed", lambda: False), \
+            mock.patch.object(
+                Recorder,
+                "input_devices",
+                staticmethod(lambda: [(0, "Microphone (USB Audio Device)")]),
+            ), \
+            mock.patch.object(settings, "QDesktopServices", fake_desktop):
+            window = settings.SettingsWindow(DemoApplication())
+            buttons = [b for b in window.findChildren(QPushButton) if b.text() == "Help"]
+            self.assertEqual(len(buttons), 1)
+            button = buttons[0]
+            self.assertFalse(button.icon().isNull())
+            self.assertIn("GitHub issues", button.toolTip())
+            button.click()
+            window.shutdown()
+            window.deleteLater()
+        self.assertEqual(opened, [settings.ISSUES_URL])
+
+    def test_the_link_is_shown_when_the_browser_cannot_be_opened(self) -> None:
+        from voicetype.ui import settings
+
+        messages: list[str] = []
+        fake_box = SimpleNamespace(
+            warning=lambda parent, title, text: messages.append(text)
+        )
+        fake_desktop = SimpleNamespace(openUrl=lambda url: False)
+        with mock.patch.object(settings, "QDesktopServices", fake_desktop), mock.patch.object(
+            settings, "QMessageBox", fake_box
+        ):
+            settings.SettingsWindow._open_issues(object())
+        self.assertEqual(len(messages), 1)
+        self.assertIn(settings.ISSUES_URL, messages[0])
 
 
 if __name__ == "__main__":

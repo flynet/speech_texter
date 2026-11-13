@@ -21,6 +21,7 @@ CTranslate2.
 - Optional CUDA acceleration pack downloaded separately from GitHub Releases
 - Optional autostart, notification sounds, initial prompt, idle model unload
 - Built-in updater verified with SHA-256
+- Help button in Settings opens the GitHub issues page for reports and questions
 - Single-instance application, per-user installer
 
 ## Screenshots
@@ -122,6 +123,7 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 | **Start with Windows** | Adds or removes a per-user `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry. No administrator rights are required. |
 | **CUDA pack** | Available only when an NVIDIA GPU is detected; on other hardware Settings shows `No NVIDIA GPU detected. CPU mode will be used.` Downloads and verifies the optional cuBLAS/cuDNN libraries used for GPU acceleration; without it VoiceType stays on the CPU. |
 | **Check for updates** | Checks GitHub Releases, compares versions, downloads the installer, verifies its SHA-256 checksum, and runs the silent installer. Automatic checks are throttled to once per day. |
+| **Help** | Opens `https://github.com/flynet/speech_texter/issues` in the default browser, so a problem, question, or feature request can be reported from Settings. If the browser cannot be opened, the link is shown in a dialog. |
 
 Most changes take effect after pressing **Apply**. The hotkey can be changed
 while VoiceType is running; other settings may reload the model or restart audio

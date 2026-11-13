@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QEvent, QTimer, Qt, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtCore import QEvent, QUrl, QTimer, Qt, Signal
+from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpinBox,
+    QStyle,
     QVBoxLayout,
     QWidget,
 )
@@ -36,6 +37,8 @@ from ..recorder import Recorder
 from ..testbench import RecognitionTester
 
 log = logging.getLogger(__name__)
+
+ISSUES_URL = "https://github.com/flynet/speech_texter/issues"
 
 
 class HotkeyEdit(QLineEdit):
@@ -588,7 +591,27 @@ class SettingsWindow(QDialog):
         self._update_status.setObjectName("muted")
         self._update_status.setWordWrap(True)
         layout.addWidget(self._update_status)
+
+        help_row = QHBoxLayout()
+        help_hint = QLabel("Found a problem? Describe it on the GitHub issues page.")
+        help_hint.setObjectName("muted")
+        help_hint.setWordWrap(True)
+        self._help_button = QPushButton("Help")
+        self._help_button.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)
+        )
+        self._help_button.setToolTip("Open the GitHub issues page in a browser")
+        self._help_button.clicked.connect(self._open_issues)
+        help_row.addWidget(help_hint, 1)
+        help_row.addWidget(self._help_button)
+        layout.addLayout(help_row)
         return group
+
+    def _open_issues(self) -> None:
+        if QDesktopServices.openUrl(QUrl(ISSUES_URL)):
+            return
+        log.warning("Could not open the issues page in a browser")
+        QMessageBox.warning(self, "Help", f"Open this link in a browser:\n{ISSUES_URL}")
 
     def _update_test_profile(self) -> None:
         model_key = self._model_combo.currentData()
