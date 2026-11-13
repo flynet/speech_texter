@@ -8,7 +8,7 @@ try:  # pragma: no cover - import order workaround
 except Exception:
     pass
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 APP_NAME = "VoiceType"
 APP_ID = "VoiceType.SingleInstance"
 GITHUB_REPO = "flynet/speech_texter"

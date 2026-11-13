@@ -258,10 +258,10 @@ Copy-Item -Recurse -Force models\small dist\VoiceType\models\small
 ### Build the installer
 
 ```powershell
-iscc /DMyAppVersion=0.2.0 installer\voicetype.iss
+iscc /DMyAppVersion=0.2.1 installer\voicetype.iss
 ```
 
-The result is written to `dist-installer\VoiceType-Setup-0.2.0.exe`.
+The result is written to `dist-installer\VoiceType-Setup-0.2.1.exe`.
 
 ### Build the CUDA pack
 
