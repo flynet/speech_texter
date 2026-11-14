@@ -267,8 +267,13 @@ recognized text.
     tokenizer is imported when a pack loads, so a broken tokenizer is a pack error
     at translation time, not a startup crash. The re-published installer was
     verified after install: the bundle has every hash-named DLL, the installed
-    tokenizer loads a downloaded pack (`开会时间是早上九点` for en \u2192 zh), and
-    the installed app starts with CUDA and loads the model.
+    tokenizer loads a downloaded pack (`开会时间是早上九点` for en → zh), and
+    the installed app starts with CUDA and loads the model. A re-published tag does
+    not update anyone: the broken 0.3.0 that shipped first reports the same
+    `__version__` as the fixed one, so the update check finds nothing to do, and
+    users who installed it within the ~90 minutes it was published have an app that
+    starts, dictates, and fails on every translation pack. The fix therefore ships
+    as **v0.3.1**, which the update check on a broken 0.3.0 finds.
 13. Live UI acceptance found that pressing **Cancel** on a download row produced a
     failure notice (`Translation pack download failed / Download cancelled.`).
     Cancelling is a user choice, not an error. Model, pack, CUDA, and update
