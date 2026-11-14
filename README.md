@@ -461,6 +461,7 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
 - [x] Update check finds the latest release and verifies SHA-256
 - [x] The installer bundle ships every hash-named DLL a repaired wheel puts in `<package>.libs`; the release build checks the bundle, and the installed tokenizer loads a downloaded pack
 - [x] The 0.3.1 installer was checked after install: the bundle matches site-packages, the installed tokenizer translates (`开会时间是早上九点`), the app starts on CUDA, and a machine on 0.3.0 is offered 0.3.1
+- [x] The 0.3.2 installer was checked after install: its published SHA-256 matched, `check_bundle_libs.py` passes on the installed bundle, the installed tokenizer translates (`开会时间是早上九点`), the app starts as `Starting VoiceType 0.3.2` and loads the model it was asked for, and the update check offers 0.3.2 to 0.2.1, 0.3.0, and 0.3.1 and nothing to 0.3.2
 - [ ] Uninstall keeps `%APPDATA%\VoiceType` and `%LOCALAPPDATA%\VoiceType`
 
 ## Troubleshooting

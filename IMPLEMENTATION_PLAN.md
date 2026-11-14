@@ -278,7 +278,12 @@ recognized text.
     `check_bundle_libs.py` passes on the installed bundle, the installed tokenizer
     translates (`开会时间是早上九点`), the app starts as `Starting VoiceType 0.3.1`
     on CUDA, and the update check offers 0.3.1 to a machine on 0.3.0 and 0.2.1 and
-    nothing to 0.3.1.
+    nothing to 0.3.1. Version 0.3.2 carries the same bundle fix and the model
+    notice wording, and was verified the same way: published SHA-256 matched,
+    `check_bundle_libs.py` passes on the installed bundle, the installed tokenizer
+    translates, the app starts as `Starting VoiceType 0.3.2`, loads
+    `large-v3-turbo` on CUDA when that is what Settings asks for, and the update
+    check offers 0.3.2 to 0.2.1, 0.3.0, and 0.3.1.
 13. Live UI acceptance found that pressing **Cancel** on a download row produced a
     failure notice (`Translation pack download failed / Download cancelled.`).
     Cancelling is a user choice, not an error. Model, pack, CUDA, and update
