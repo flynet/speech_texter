@@ -252,13 +252,20 @@ recognized text.
     0.82–0.88 for German, French, Dutch, and Swedish, because the pack picks
     inflected word forms the reference does not use. The number is a fidelity
     indicator, not a quality score.
-12. The 0.3.0 installer shipped a broken SentencePiece. `collect_all` renames the
-    hashed runtime DLLs a repaired wheel ships in `<package>.libs`
-    (`msvcp140-<hash>.dll`), so `_sentencepiece` failed to load and VoiceType
-    0.3.0 did not start: `DLL load failed while importing _sentencepiece`. Fixed
-    by copying `<package>.libs` the way the wheel ships it in `voicetype.spec`,
-    and by importing the tokenizer when a pack loads, so a broken tokenizer shows
-    up as a pack error at translation time instead of a startup crash.
+12. The 0.3.0 installer shipped a broken SentencePiece: `_sentencepiece` failed to
+    load (`DLL load failed while importing _sentencepiece`) and VoiceType 0.3.0 did
+    not start. A repaired wheel ships its runtime DLLs in `<package>.libs` with
+    hash names (`msvcp140-<hash>.dll`) and patches the package to add that
+    directory to the DLL search path. PyInstaller recognizes those DLLs as the
+    Microsoft C++ runtime, normalizes the name, and moves the copy to the bundle
+    root, so the hash name the extension asks for is gone. Packages with their own
+    PyInstaller hook (numpy, av) keep the directory; sentencepiece has no hook, so
+    the DLLs are copied as `datas`, which copies them verbatim, and
+    `scripts/check_bundle_libs.py` fails the release build when a hash-named DLL is
+    missing from the bundle. Adding the DLLs to `binaries` looked fine in the local
+    build and failed on the runner, which is why the bundle check runs in CI. The
+    tokenizer is imported when a pack loads, so a broken tokenizer is a pack error
+    at translation time, not a startup crash.
 13. Live UI acceptance found that pressing **Cancel** on a download row produced a
     failure notice (`Translation pack download failed / Download cancelled.`).
     Cancelling is a user choice, not an error. Model, pack, CUDA, and update

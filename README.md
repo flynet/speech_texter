@@ -295,12 +295,16 @@ source build and keeps the log visible in the console window.
 .\.venv\Scripts\python.exe scripts\generate_assets.py
 .\.venv\Scripts\python.exe scripts\fetch_models.py --models small
 .\.venv\Scripts\pyinstaller.exe --noconfirm --clean voicetype.spec
+.\.venv\Scripts\python.exe scripts\check_bundle_libs.py dist\VoiceType\_internal
 New-Item -ItemType Directory -Force dist\VoiceType\models | Out-Null
 Copy-Item -Recurse -Force models\small dist\VoiceType\models\small
 ```
 
 `models` must be copied next to `dist\VoiceType\VoiceType.exe`, not into
-`dist\VoiceType\_internal`.
+`dist\VoiceType\_internal`. The bundle check fails when a hash-named DLL a
+repaired wheel ships in `<package>.libs` is not in the bundle, which is the
+failure `_sentencepiece` reports as `DLL load failed while importing
+_sentencepiece`; the release build runs the same check.
 
 ### Build the installer
 

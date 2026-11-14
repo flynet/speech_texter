@@ -1391,6 +1391,72 @@ class HelpButtonTests(unittest.TestCase):
         self.assertIn(settings.ISSUES_URL, messages[0])
 
 
+class BundleLibsCheckTests(unittest.TestCase):
+    """The build must keep every hash name a repaired wheel ships."""
+
+    def _tree(self, root: Path, names: list[str]) -> None:
+        for name in names:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"MZ")
+
+    def test_a_renamed_dll_is_reported(self) -> None:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import check_bundle_libs
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            site = base / "site"
+            bundle = base / "bundle"
+            self._tree(
+                site,
+                [
+                    "sentencepiece.libs/msvcp140-a4c2229b.dll",
+                    "sentencepiece.libs/vcomp140-f96f3a14.dll",
+                ],
+            )
+            # PyInstaller normalizes the Microsoft C++ runtime name, so the hash
+            # name the extension asks for is gone from the bundle.
+            self._tree(bundle, ["sentencepiece.libs/vcomp140-f96f3a14.dll"])
+            self.assertEqual(
+                check_bundle_libs.missing(site, bundle),
+                ["sentencepiece.libs: msvcp140-a4c2229b.dll"],
+            )
+
+    def test_a_full_bundle_passes(self) -> None:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import check_bundle_libs
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            site = base / "site"
+            bundle = base / "bundle"
+            names = [
+                "numpy.libs/libscipy_openblas64-ed4f167a.dll",
+                "numpy.libs/msvcp140-a4c2229b.dll",
+                "sentencepiece.libs/msvcp140-a4c2229b.dll",
+                "sentencepiece.libs/vcomp140-f96f3a14.dll",
+            ]
+            self._tree(site, names)
+            self._tree(bundle, names)
+            self.assertEqual(check_bundle_libs.missing(site, bundle), [])
+
+    def test_a_missing_directory_is_reported(self) -> None:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import check_bundle_libs
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            site = base / "site"
+            bundle = base / "bundle"
+            self._tree(site, ["av.libs/avcodec-63-2756d4ff.dll"])
+            (bundle / "sentencepiece.libs").mkdir(parents=True)
+            self.assertEqual(
+                check_bundle_libs.missing(site, bundle),
+                ["av.libs: the directory is not in the bundle"],
+            )
+
+
 class SettingsTranslationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
