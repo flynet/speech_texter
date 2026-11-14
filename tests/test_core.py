@@ -1531,6 +1531,34 @@ class SettingsTranslationTests(unittest.TestCase):
         finally:
             self._close_window(stack, window)
 
+    def test_the_cuda_row_returns_to_download_on_cancel(self) -> None:
+        from voicetype import hardware
+        from voicetype.app import CANCELLED_MESSAGE
+
+        stack, app, window = self._open_window()
+        try:
+            gpu = SimpleNamespace(name="GeForce GTX 1650", free_mb=1500)
+            stack.enter_context(mock.patch.object(hardware, "detect_nvidia_gpus", lambda: [gpu]))
+            window._refresh_cuda()
+            self.assertIn("Download the CUDA pack", window._cuda_status.text())
+            self.assertEqual("Download CUDA pack", window._cuda_button.text())
+
+            # Downloading shows a Cancel button, and Cancel is the row's action.
+            window.set_cuda_downloading(True)
+            self.assertEqual(
+                "Downloading the CUDA acceleration pack...", window._cuda_status.text()
+            )
+            self.assertEqual("Cancel download", window._cuda_button.text())
+            self.assertTrue(window._cuda_downloading)
+
+            # A cancel resets the row and names it a cancellation, not a failure.
+            window._on_cuda_finished(False, CANCELLED_MESSAGE)
+            self.assertFalse(window._cuda_downloading)
+            self.assertEqual("Download CUDA pack", window._cuda_button.text())
+            self.assertEqual(CANCELLED_MESSAGE, window._status_label.text())
+        finally:
+            self._close_window(stack, window)
+
     def test_the_pack_manager_shows_the_download_state(self) -> None:
         from voicetype import translation
 
