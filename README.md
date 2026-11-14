@@ -458,6 +458,7 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
 - [ ] Single instance: launching a second copy shows a message
 - [x] Update check finds the latest release and verifies SHA-256
 - [x] The installer bundle ships every hash-named DLL a repaired wheel puts in `<package>.libs`; the release build checks the bundle, and the installed tokenizer loads a downloaded pack
+- [x] The 0.3.1 installer was checked after install: the bundle matches site-packages, the installed tokenizer translates (`开会时间是早上九点`), the app starts on CUDA, and a machine on 0.3.0 is offered 0.3.1
 - [ ] Uninstall keeps `%APPDATA%\VoiceType` and `%LOCALAPPDATA%\VoiceType`
 
 ## Troubleshooting

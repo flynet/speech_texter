@@ -273,7 +273,12 @@ recognized text.
     `__version__` as the fixed one, so the update check finds nothing to do, and
     users who installed it within the ~90 minutes it was published have an app that
     starts, dictates, and fails on every translation pack. The fix therefore ships
-    as **v0.3.1**, which the update check on a broken 0.3.0 finds.
+    as **v0.3.1**, which the update check on a broken 0.3.0 finds. The 0.3.1
+    installer was verified after install: its published SHA-256 matched,
+    `check_bundle_libs.py` passes on the installed bundle, the installed tokenizer
+    translates (`开会时间是早上九点`), the app starts as `Starting VoiceType 0.3.1`
+    on CUDA, and the update check offers 0.3.1 to a machine on 0.3.0 and 0.2.1 and
+    nothing to 0.3.1.
 13. Live UI acceptance found that pressing **Cancel** on a download row produced a
     failure notice (`Translation pack download failed / Download cancelled.`).
     Cancelling is a user choice, not an error. Model, pack, CUDA, and update
