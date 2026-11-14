@@ -295,6 +295,12 @@ recognized text.
     `Model not downloaded`, with display names, and the tray line keeps
     `translate → target` after the load: the ready handler used the raw
     `name · DEVICE` line, so the suffix vanished the moment the model was ready.
+    Live acceptance on the app's own startup path: one load, one notice,
+    `Medium · CUDA · translate → ZH`. With translation off and the turbo model
+    installed, the app loads it, prints `Large v3 Turbo · CUDA`, and notifies
+    nothing. With the turbo model reported as not installed, the notice is
+    `Model not downloaded / Large v3 Turbo is not downloaded. VoiceType uses
+    Small. Download it in Settings.` and the line is `Small · CPU`.
 
 ## 6. Test audio
 
