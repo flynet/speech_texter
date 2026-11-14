@@ -444,7 +444,7 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
 - [x] With translation on, the tray status shows a full multilingual model (`medium`, `small`, or `base`) and `translate → EN` for an English target, not `large-v3-turbo`
 - [x] The tray shows the selected target (`translate → DE` for German), and the test bench result names it
 - [x] The **Language** selector and the translation target selector act independently
-- [x] A target that needs a pack reports the missing pack before Whisper loads, and its row in Settings downloads it with progress and cancel
+- [x] A target that needs a pack reports the missing pack before Whisper loads, and its row in Settings downloads it with progress and cancel; a cancelled download leaves the row at **Download** with no failure notice (model, CUDA, and update downloads behave the same)
 - [ ] Russian speech with target German gives German text through the English stage; English speech with target Russian gives Russian text
 - [ ] A target that matches the spoken language keeps the recognized text as it was
 - [x] **Remove** deletes an installed pack, the row goes back to **Download**, and the disk space is freed

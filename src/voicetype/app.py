@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal
 from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 
 from . import __version__, autostart, cuda, hardware, models, translation
-from .config import AppConfig, assets_dir
+from .config import CANCELLED_MESSAGE, AppConfig, assets_dir
 from .hotkeys import HotkeyListener
 from .inserter import Inserter
 from .recorder import Recorder
@@ -21,9 +21,6 @@ from .ui.tray import TrayIcon
 from .updater import UpdateChecker, UpdateInfo
 
 log = logging.getLogger(__name__)
-
-# A download the user cancelled is not a failure, so it gets no failure notice.
-CANCELLED_MESSAGE = "Download cancelled."
 
 
 class VoiceTypeApplication(QObject):
@@ -629,7 +626,8 @@ class VoiceTypeApplication(QObject):
                     cancel=cancel,
                 )
             except cuda.CudaDownloadCancelled:
-                self.cuda_finished.emit(False, "CUDA pack download cancelled.")
+                log.info("CUDA pack download cancelled")
+                self.cuda_finished.emit(False, CANCELLED_MESSAGE)
             except Exception as exc:
                 log.exception("CUDA pack download failed")
                 self.cuda_finished.emit(False, str(exc))
@@ -651,10 +649,17 @@ class VoiceTypeApplication(QObject):
         hardware.reset_cuda_cache()
         if self._settings is not None:
             self._settings.set_cuda_downloading(False)
+        elif self._selection is not None and self._model_loaded:
+            # The CUDA prompt can start a download with no Settings window open,
+            # so the tray line has to go back to the model and device itself.
+            name = models.MODELS[self._selection.model].display_name
+            self._tray.set_status_text(self._status_text(name))
+        else:
+            self._tray.set_status_text("")
         if ok:
             self._tray.notify("CUDA acceleration", message)
-        elif message:
-            self._tray.notify("CUDA acceleration", message)
+        elif message and message != CANCELLED_MESSAGE:
+            self._tray.notify("CUDA acceleration failed", message)
 
     def _maybe_prompt_cuda(self) -> None:
         if self.config.cuda_prompt_shown:
@@ -797,7 +802,8 @@ class VoiceTypeApplication(QObject):
         self._update_cancel = None
         if self._settings is not None:
             self._settings.set_update_status(message)
-        self._tray.notify("Update failed", message)
+        if message != CANCELLED_MESSAGE:
+            self._tray.notify("Update download failed", message)
 
     # --------------------------------------------------------------------- ui
 

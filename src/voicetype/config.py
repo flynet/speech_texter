@@ -10,6 +10,11 @@ from typing import Any
 APP_NAME = "VoiceType"
 CONFIG_VERSION = 2
 
+# A download the user stopped is not a failure, and the message says so. Handlers
+# compare against this exact string to keep the tray from reporting a cancellation
+# as a download failure.
+CANCELLED_MESSAGE = "Download cancelled."
+
 DEFAULT_HALLUCINATIONS = [
     "Продолжение следует...",
     "Продолжение следует",

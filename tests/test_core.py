@@ -322,39 +322,65 @@ class TrayStatusTextTests(unittest.TestCase):
 class DownloadCancelNotificationTests(unittest.TestCase):
     """A download the user cancelled is not a failure, so nothing says it is."""
 
-    def _stub(self):
+    def _stub(self, settings: bool = True):
+        import types
         from unittest import mock
 
         from voicetype.app import VoiceTypeApplication
 
         notified: list[tuple[str, str]] = []
         resets: list = []
+        statuses: list[str] = []
         stub = SimpleNamespace(
             config=AppConfig(model="auto"),
             _state="idle",
             _pending_reconfigure=False,
+            _active_device="cpu",
             _model_download_cancel=mock.Mock(),
             _model_download_key="small",
             _pack_download_cancel=mock.Mock(),
             _pack_download_target="de",
-            _settings=SimpleNamespace(
-                set_model_downloading=lambda key, active: resets.append(("model", key, active)),
-                set_pack_downloading=lambda target, active: resets.append(("pack", target, active)),
-                refresh=lambda: resets.append("refresh"),
+            _cuda_download_cancel=mock.Mock(),
+            _update_cancel=mock.Mock(),
+            _progress_dialog=None,
+            _selection=hardware.Selection("cpu", "small", "Auto on CPU"),
+            _model_loaded=True,
+            _settings=(
+                SimpleNamespace(
+                    set_model_downloading=lambda key, active: resets.append(
+                        ("model", key, active)
+                    ),
+                    set_pack_downloading=lambda target, active: resets.append(
+                        ("pack", target, active)
+                    ),
+                    set_cuda_downloading=lambda active: resets.append(("cuda", active)),
+                    set_update_status=lambda text: resets.append(("update", text)),
+                    refresh=lambda: resets.append("refresh"),
+                )
+                if settings
+                else None
             ),
-            _tray=SimpleNamespace(notify=lambda title, message: notified.append((title, message))),
+            _tray=SimpleNamespace(
+                notify=lambda title, message: notified.append((title, message)),
+                set_status_text=lambda text: statuses.append(text),
+            ),
             _configure_from_config=lambda: resets.append("configure"),
         )
+        # Use the real tray line logic, not a copy of it.
+        stub._status_text = types.MethodType(VoiceTypeApplication._status_text, stub)
+        stub._device_label = types.MethodType(VoiceTypeApplication._device_label, stub)
         handlers = {
             "model": VoiceTypeApplication._on_model_download_finished,
             "pack": VoiceTypeApplication._on_pack_download_finished,
+            "cuda": VoiceTypeApplication._on_cuda_finished,
+            "update": VoiceTypeApplication._on_update_download_failed,
         }
-        return stub, handlers, notified, resets
+        return stub, handlers, notified, resets, statuses
 
     def test_a_cancelled_pack_download_gets_no_failure_notice(self) -> None:
         from voicetype.app import CANCELLED_MESSAGE
 
-        stub, handlers, notified, resets = self._stub()
+        stub, handlers, notified, resets, statuses = self._stub()
         handlers["pack"](stub, "de", False, CANCELLED_MESSAGE)
         self.assertIsNone(stub._pack_download_cancel)
         self.assertEqual(resets, [("pack", "de", False), "refresh"])
@@ -363,7 +389,7 @@ class DownloadCancelNotificationTests(unittest.TestCase):
     def test_a_cancelled_model_download_gets_no_failure_notice(self) -> None:
         from voicetype.app import CANCELLED_MESSAGE
 
-        stub, handlers, notified, resets = self._stub()
+        stub, handlers, notified, resets, statuses = self._stub()
         handlers["model"](stub, "small", False, CANCELLED_MESSAGE)
         self.assertIsNone(stub._model_download_cancel)
         self.assertEqual(resets, [("model", "small", False), "refresh"])
@@ -372,10 +398,58 @@ class DownloadCancelNotificationTests(unittest.TestCase):
     def test_a_real_pack_failure_is_still_reported(self) -> None:
         from voicetype.app import CANCELLED_MESSAGE
 
-        stub, handlers, notified, resets = self._stub()
+        stub, handlers, notified, resets, statuses = self._stub()
         handlers["pack"](stub, "de", False, "Checksum mismatch.")
         self.assertEqual(
             notified, [("Translation pack download failed", "Checksum mismatch.")]
+        )
+
+    def test_a_cancelled_cuda_download_gets_no_failure_notice(self) -> None:
+        from voicetype.app import CANCELLED_MESSAGE
+
+        stub, handlers, notified, resets, statuses = self._stub()
+        handlers["cuda"](stub, False, CANCELLED_MESSAGE)
+        self.assertIsNone(stub._cuda_download_cancel)
+        self.assertEqual(resets, [("cuda", False)])
+        self.assertEqual(notified, [])
+
+    def test_a_real_cuda_failure_is_reported_as_a_failure(self) -> None:
+        stub, handlers, notified, resets, statuses = self._stub()
+        handlers["cuda"](stub, False, "cublas init failed.")
+        self.assertEqual(notified, [("CUDA acceleration failed", "cublas init failed.")])
+
+    def test_a_successful_cuda_install_is_still_announced(self) -> None:
+        message = "CUDA pack installed. Restart VoiceType to use the GPU."
+        stub, handlers, notified, resets, statuses = self._stub()
+        handlers["cuda"](stub, True, message)
+        self.assertEqual(notified, [("CUDA acceleration", message)])
+
+    def test_a_tray_cuda_cancel_restores_the_tray_status_line(self) -> None:
+        from voicetype.app import CANCELLED_MESSAGE
+
+        # The CUDA prompt can start a download with no Settings window open, so
+        # the tray line has to go back to the model and device on its own.
+        stub, handlers, notified, resets, statuses = self._stub(settings=False)
+        handlers["cuda"](stub, False, CANCELLED_MESSAGE)
+        self.assertEqual(statuses, ["Small · CPU"])
+        self.assertEqual(resets, [])
+        self.assertEqual(notified, [])
+
+    def test_a_cancelled_update_download_gets_no_failure_notice(self) -> None:
+        from voicetype.app import CANCELLED_MESSAGE
+
+        stub, handlers, notified, resets, statuses = self._stub()
+        handlers["update"](stub, CANCELLED_MESSAGE)
+        self.assertIsNone(stub._update_cancel)
+        self.assertEqual(resets, [("update", CANCELLED_MESSAGE)])
+        self.assertEqual(notified, [])
+
+    def test_a_real_update_failure_is_reported_as_a_failure(self) -> None:
+        stub, handlers, notified, resets, statuses = self._stub()
+        handlers["update"](stub, "Installer checksum mismatch.")
+        self.assertEqual(resets, [("update", "Installer checksum mismatch.")])
+        self.assertEqual(
+            notified, [("Update download failed", "Installer checksum mismatch.")]
         )
 
 

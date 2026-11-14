@@ -13,6 +13,7 @@ import requests
 from PySide6.QtCore import QCoreApplication, QObject, Signal
 
 from . import GITHUB_REPO, __version__
+from .config import CANCELLED_MESSAGE
 
 log = logging.getLogger(__name__)
 
@@ -226,9 +227,10 @@ class UpdateChecker(QObject):
                     f"Installer checksum mismatch: expected {expected}, got {actual}."
                 )
         except UpdateCancelled:
+            log.info("Update download cancelled")
             destination.unlink(missing_ok=True)
             self._downloading = False
-            self.download_failed.emit("Update download cancelled.")
+            self.download_failed.emit(CANCELLED_MESSAGE)
             return
         except Exception as exc:
             log.exception("Update download failed")

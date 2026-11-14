@@ -259,6 +259,13 @@ recognized text.
     by copying `<package>.libs` the way the wheel ships it in `voicetype.spec`,
     and by importing the tokenizer when a pack loads, so a broken tokenizer shows
     up as a pack error at translation time instead of a startup crash.
+13. Live UI acceptance found that pressing **Cancel** on a download row produced a
+    failure notice (`Translation pack download failed / Download cancelled.`).
+    Cancelling is a user choice, not an error. Model, pack, CUDA, and update
+    downloads now share `config.CANCELLED_MESSAGE`: a cancelled download resets
+    the row, logs at info, and emits no failure notice, while real failures keep
+    their `... failed` title. The CUDA tray line is restored when a download is
+    cancelled with no Settings window open, which is the CUDA prompt path.
 
 ## 6. Test audio
 
