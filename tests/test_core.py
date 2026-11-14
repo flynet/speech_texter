@@ -319,6 +319,66 @@ class TrayStatusTextTests(unittest.TestCase):
         )
 
 
+class DownloadCancelNotificationTests(unittest.TestCase):
+    """A download the user cancelled is not a failure, so nothing says it is."""
+
+    def _stub(self):
+        from unittest import mock
+
+        from voicetype.app import VoiceTypeApplication
+
+        notified: list[tuple[str, str]] = []
+        resets: list = []
+        stub = SimpleNamespace(
+            config=AppConfig(model="auto"),
+            _state="idle",
+            _pending_reconfigure=False,
+            _model_download_cancel=mock.Mock(),
+            _model_download_key="small",
+            _pack_download_cancel=mock.Mock(),
+            _pack_download_target="de",
+            _settings=SimpleNamespace(
+                set_model_downloading=lambda key, active: resets.append(("model", key, active)),
+                set_pack_downloading=lambda target, active: resets.append(("pack", target, active)),
+                refresh=lambda: resets.append("refresh"),
+            ),
+            _tray=SimpleNamespace(notify=lambda title, message: notified.append((title, message))),
+            _configure_from_config=lambda: resets.append("configure"),
+        )
+        handlers = {
+            "model": VoiceTypeApplication._on_model_download_finished,
+            "pack": VoiceTypeApplication._on_pack_download_finished,
+        }
+        return stub, handlers, notified, resets
+
+    def test_a_cancelled_pack_download_gets_no_failure_notice(self) -> None:
+        from voicetype.app import CANCELLED_MESSAGE
+
+        stub, handlers, notified, resets = self._stub()
+        handlers["pack"](stub, "de", False, CANCELLED_MESSAGE)
+        self.assertIsNone(stub._pack_download_cancel)
+        self.assertEqual(resets, [("pack", "de", False), "refresh"])
+        self.assertEqual(notified, [])
+
+    def test_a_cancelled_model_download_gets_no_failure_notice(self) -> None:
+        from voicetype.app import CANCELLED_MESSAGE
+
+        stub, handlers, notified, resets = self._stub()
+        handlers["model"](stub, "small", False, CANCELLED_MESSAGE)
+        self.assertIsNone(stub._model_download_cancel)
+        self.assertEqual(resets, [("model", "small", False), "refresh"])
+        self.assertEqual(notified, [])
+
+    def test_a_real_pack_failure_is_still_reported(self) -> None:
+        from voicetype.app import CANCELLED_MESSAGE
+
+        stub, handlers, notified, resets = self._stub()
+        handlers["pack"](stub, "de", False, "Checksum mismatch.")
+        self.assertEqual(
+            notified, [("Translation pack download failed", "Checksum mismatch.")]
+        )
+
+
 class InserterClipboardTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -755,6 +815,14 @@ class TranslationPackTests(unittest.TestCase):
             with self._data_dir(Path(tmp)):
                 with self.assertRaises(RuntimeError):
                     translation.get_translator("de")
+
+    def test_the_module_starts_without_the_tokenizer(self) -> None:
+        from voicetype import translation
+
+        # The SentencePiece extension is imported when a pack loads, so the app
+        # starts on a machine whose tokenizer DLLs are broken; the pack error
+        # then shows up at translation time, not as a startup crash.
+        self.assertFalse(hasattr(translation, "spm"))
 
     def test_a_cached_pack_is_reloaded_on_the_next_run(self) -> None:
         from voicetype import translation
@@ -1382,6 +1450,10 @@ class SettingsTranslationTests(unittest.TestCase):
                 codes, [info.code for info in translation.TARGET_LANGUAGES if info.asset]
             )
             self.assertNotIn("en", codes)
+            # A row names the model it downloads, so the license is visible.
+            tooltip = window._pack_rows["zh"]._name.toolTip()
+            self.assertIn("Helsinki-NLP/opus-mt-en-zh", tooltip)
+            self.assertIn("Apache-2.0", tooltip)
         finally:
             self._close_window(stack, window)
 

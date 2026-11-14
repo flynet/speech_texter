@@ -22,6 +22,9 @@ from .updater import UpdateChecker, UpdateInfo
 
 log = logging.getLogger(__name__)
 
+# A download the user cancelled is not a failure, so it gets no failure notice.
+CANCELLED_MESSAGE = "Download cancelled."
+
 
 class VoiceTypeApplication(QObject):
     configure_worker = Signal(str, str, str, str, object, bool, bool, str)
@@ -489,7 +492,8 @@ class VoiceTypeApplication(QObject):
                     cancel=cancel,
                 )
             except models.DownloadCancelled:
-                self.model_download_finished.emit(key, False, "Download cancelled.")
+                log.info("Model download cancelled")
+                self.model_download_finished.emit(key, False, CANCELLED_MESSAGE)
             except Exception as exc:
                 log.exception("Model download failed")
                 self.model_download_finished.emit(key, False, str(exc))
@@ -530,7 +534,8 @@ class VoiceTypeApplication(QObject):
                     cancel=cancel,
                 )
             except translation.PackCancelled:
-                self.pack_download_finished.emit(target, False, "Download cancelled.")
+                log.info("Translation pack download cancelled")
+                self.pack_download_finished.emit(target, False, CANCELLED_MESSAGE)
             except Exception as exc:
                 log.exception("Translation pack download failed")
                 self.pack_download_finished.emit(target, False, str(exc))
@@ -585,7 +590,7 @@ class VoiceTypeApplication(QObject):
         name = info.display_name if info is not None else target
         if ok:
             self._tray.notify("Translation pack downloaded", f"{name} is ready to use.")
-        elif message:
+        elif message and message != CANCELLED_MESSAGE:
             self._tray.notify("Translation pack download failed", message)
 
     def _on_model_download_finished(self, key: str, ok: bool, message: str) -> None:
@@ -604,7 +609,7 @@ class VoiceTypeApplication(QObject):
                     self._pending_reconfigure = True
                 else:
                     self._configure_from_config()
-        elif message:
+        elif message and message != CANCELLED_MESSAGE:
             self._tray.notify("Model download failed", message)
 
     def download_cuda_pack(self) -> None:
