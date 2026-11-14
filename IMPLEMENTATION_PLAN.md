@@ -58,9 +58,11 @@ installer/
 .github/workflows/
   release.yml          # tag v* -> installer + SHA256SUMS
   cuda-pack.yml        # tag cuda-pack-v* -> cuda-pack-v1 release
+  mt-packs.yml         # tag mt-packs-v* -> mt-packs-v1 release
 voicetype.spec         # PyInstaller --onedir
 requirements.txt
 requirements-build.txt
+requirements-packs.txt
 pyproject.toml
 README.md
 tests/audio/README.md

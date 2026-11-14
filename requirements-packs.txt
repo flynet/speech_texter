@@ -1,0 +1,5 @@
+# Tools for scripts/build_mt_packs.py, used only when translation packs are
+# built in CI. ctranslate2, sentencepiece and requests are runtime dependencies
+# in requirements.txt, and the workflow installs torch from the CPU wheel index,
+# so the installer build in release.yml does not install torch at all.
+transformers==5.23.0

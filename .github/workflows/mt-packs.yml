@@ -31,7 +31,7 @@ jobs:
         # so torch is installed from the CPU index to keep the download small.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ctranslate2==4.8.5 transformers==5.23.0 sentencepiece==0.2.3 requests==2.34.2
+          python -m pip install -r requirements.txt -r requirements-packs.txt
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Build translation packs

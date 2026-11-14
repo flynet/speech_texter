@@ -292,7 +292,14 @@ extracts the Windows DLLs, creates `voicetype-cuda-pack.zip`, and writes
 
 ### Build the translation packs
 
+Building packs needs the Hugging Face converter, so install the build-time tools
+and a CPU torch build first. The app itself never uses torch, and
+`requirements-build.txt` (PyInstaller only) does not pull it, so the installer
+build stays small:
+
 ```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-packs.txt
+.\.venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe scripts\build_mt_packs.py --dist dist-mt-packs
 ```
 
