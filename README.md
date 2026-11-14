@@ -457,6 +457,7 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
 - [ ] Autostart toggles survive a reboot / sign-out
 - [ ] Single instance: launching a second copy shows a message
 - [x] Update check finds the latest release and verifies SHA-256
+- [x] The installer bundle ships every hash-named DLL a repaired wheel puts in `<package>.libs`; the release build checks the bundle, and the installed tokenizer loads a downloaded pack
 - [ ] Uninstall keeps `%APPDATA%\VoiceType` and `%LOCALAPPDATA%\VoiceType`
 
 ## Troubleshooting

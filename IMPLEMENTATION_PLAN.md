@@ -265,7 +265,10 @@ recognized text.
     missing from the bundle. Adding the DLLs to `binaries` looked fine in the local
     build and failed on the runner, which is why the bundle check runs in CI. The
     tokenizer is imported when a pack loads, so a broken tokenizer is a pack error
-    at translation time, not a startup crash.
+    at translation time, not a startup crash. The re-published installer was
+    verified after install: the bundle has every hash-named DLL, the installed
+    tokenizer loads a downloaded pack (`开会时间是早上九点` for en \u2192 zh), and
+    the installed app starts with CUDA and loads the model.
 13. Live UI acceptance found that pressing **Cancel** on a download row produced a
     failure notice (`Translation pack download failed / Download cancelled.`).
     Cancelling is a user choice, not an error. Model, pack, CUDA, and update
