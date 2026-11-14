@@ -15,7 +15,6 @@ from typing import Callable
 
 import ctranslate2
 import requests
-import sentencepiece as spm
 
 from . import __version__
 from . import config as cfg
@@ -372,6 +371,11 @@ class PackTranslator:
     def __init__(self, info: TargetLanguage, directory: Path) -> None:
         self.info = info
         self._directory = directory
+        # SentencePiece is an extension module with its own DLLs. Importing it
+        # when a pack loads means a missing tokenizer shows up as a pack error
+        # at translation time, not as a crash at app startup.
+        import sentencepiece as spm
+
         self._source = spm.SentencePieceProcessor()
         self._source.load(str(directory / "source.spm"))
         self._target = spm.SentencePieceProcessor()

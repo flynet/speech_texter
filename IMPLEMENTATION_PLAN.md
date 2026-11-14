@@ -252,6 +252,13 @@ recognized text.
     0.82–0.88 for German, French, Dutch, and Swedish, because the pack picks
     inflected word forms the reference does not use. The number is a fidelity
     indicator, not a quality score.
+12. The 0.3.0 installer shipped a broken SentencePiece. `collect_all` renames the
+    hashed runtime DLLs a repaired wheel ships in `<package>.libs`
+    (`msvcp140-<hash>.dll`), so `_sentencepiece` failed to load and VoiceType
+    0.3.0 did not start: `DLL load failed while importing _sentencepiece`. Fixed
+    by copying `<package>.libs` the way the wheel ships it in `voicetype.spec`,
+    and by importing the tokenizer when a pack loads, so a broken tokenizer shows
+    up as a pack error at translation time instead of a startup crash.
 
 ## 6. Test audio
 

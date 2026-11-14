@@ -440,18 +440,18 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
 - [ ] New recordings are ignored while the overlay shows `Processing`
 - [ ] CPU mode works on a machine without an NVIDIA GPU
 - [ ] CUDA mode falls back to CPU if the CUDA pack is missing or broken
-- [ ] With **Translate the recognized text** on, Russian speech becomes English text; with it off, the original language output is returned
-- [ ] With translation on, the tray status shows a full multilingual model (`medium`, `small`, or `base`) and `translate → EN` for an English target, not `large-v3-turbo`
-- [ ] The tray shows the selected target (`translate → DE` for German), and the test bench result names it
-- [ ] The **Language** selector and the translation target selector act independently
-- [ ] A target that needs a pack reports the missing pack before Whisper loads, and its row in Settings downloads it with progress and cancel
+- [x] With **Translate the recognized text** on, Russian speech becomes English text; with it off, the original language output is returned
+- [x] With translation on, the tray status shows a full multilingual model (`medium`, `small`, or `base`) and `translate → EN` for an English target, not `large-v3-turbo`
+- [x] The tray shows the selected target (`translate → DE` for German), and the test bench result names it
+- [x] The **Language** selector and the translation target selector act independently
+- [x] A target that needs a pack reports the missing pack before Whisper loads, and its row in Settings downloads it with progress and cancel
 - [ ] Russian speech with target German gives German text through the English stage; English speech with target Russian gives Russian text
 - [ ] A target that matches the spoken language keeps the recognized text as it was
-- [ ] **Remove** deletes an installed pack, the row goes back to **Download**, and the disk space is freed
-- [ ] Hovering a pack row shows its source model and license
+- [x] **Remove** deletes an installed pack, the row goes back to **Download**, and the disk space is freed
+- [x] Hovering a pack row shows its source model and license
 - [ ] Autostart toggles survive a reboot / sign-out
 - [ ] Single instance: launching a second copy shows a message
-- [ ] Update check finds the latest release and verifies SHA-256
+- [x] Update check finds the latest release and verifies SHA-256
 - [ ] Uninstall keeps `%APPDATA%\VoiceType` and `%LOCALAPPDATA%\VoiceType`
 
 ## Troubleshooting
@@ -474,6 +474,11 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
   English needs its local pack. Open Settings, press **Download** on the row for
   that language, and dictate again. If the target matches the language you speak,
   the recognized text is kept as it was.
+- **A pack fails with a tokenizer error.** VoiceType starts and dictates
+  normally; only the pack fails. The SentencePiece tokenizer is loaded when a
+  pack is used, so recognition does not need it. Reinstall VoiceType: the
+  installer ships the tokenizer DLLs the pack needs, and
+  `%LOCALAPPDATA%\VoiceType\logs\app.log` shows which DLL is missing.
 - **Antivirus warnings.** PyInstaller executables are sometimes flagged. Verify
   the SHA-256 checksum and add an exclusion only if you trust the release.
 

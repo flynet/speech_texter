@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import re
+import sysconfig
 
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.win32.versioninfo import (
@@ -86,6 +87,25 @@ hiddenimports = [
     "six",
 ]
 
+SITE_PACKAGES = Path(sysconfig.get_paths()["purelib"])
+
+
+def collect_libs(package: str) -> list[tuple[str, str]]:
+    """Keep every DLL a repaired wheel ships in `<package>.libs`.
+
+    Delvewheel renames the bundled Microsoft C++ runtime DLLs to hash names and
+    patches the package to add `<package>.libs` to the DLL search path.
+    PyInstaller sees those DLLs as system runtime and collects them under their
+    plain names, so the hash name the extension asks for is missing and the
+    extension fails to load with `DLL load failed while importing
+    _sentencepiece`. Copy the directory the way the wheel ships it.
+    """
+    lib_dir = SITE_PACKAGES / f"{package}.libs"
+    if not lib_dir.is_dir():
+        return []
+    return [(str(path), lib_dir.name) for path in sorted(lib_dir.glob("*.dll"))]
+
+
 for package in (
     "ctranslate2",
     "faster_whisper",
@@ -102,6 +122,12 @@ for package in (
     datas += package_datas
     binaries += package_binaries
     hiddenimports += package_hiddenimports
+    # collect_all renames the hashed runtime DLLs, so copy them by hand.
+    collected = {tuple(entry[:2]) for entry in binaries}
+    for source, destination in collect_libs(package):
+        if (source, destination) not in collected:
+            binaries.append((source, destination))
+            collected.add((source, destination))
 
 a = Analysis(
     [str(SRC / "voicetype" / "__main__.py")],
