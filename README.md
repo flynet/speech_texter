@@ -440,6 +440,7 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
 - [ ] New recordings are ignored while the overlay shows `Processing`
 - [ ] CPU mode works on a machine without an NVIDIA GPU
 - [ ] CUDA mode falls back to CPU if the CUDA pack is missing or broken
+- [x] The **CUDA pack** row shows progress with **Cancel**, returns to **Download** on a cancel with no failure notice, reports `CUDA acceleration failed` on a real download error, announces the installed pack on success, and the tray status line goes back to the model and device when a download is cancelled with no Settings window open
 - [x] With **Translate the recognized text** on, Russian speech becomes English text; with it off, the original language output is returned
 - [x] With translation on, the tray status shows a full multilingual model (`medium`, `small`, or `base`) and `translate → EN` for an English target, not `large-v3-turbo`
 - [x] The tray shows the selected target (`translate → DE` for German), and the test bench result names it
