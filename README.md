@@ -27,6 +27,38 @@ CTranslate2.
 - Help button in Settings opens the GitHub issues page for reports and questions
 - Single-instance application, per-user installer
 
+## Translation
+
+Translation is optional and **off by default**, so nothing is downloaded until
+you ask for it. Enable **Translate the recognized text** in Settings, pick
+**Translate to**, and download the pack for that language with one click in the
+pack list.
+
+| Target | How VoiceType produces it | Download |
+| --- | --- | --- |
+| English | Whisper `translate` task: any spoken language becomes English text | none |
+| Russian | OPUS-MT pack `en-ru` | 67 MB |
+| German | OPUS-MT pack `en-de` | 60 MB |
+| French | OPUS-MT pack `en-fr` | 60 MB |
+| Spanish | OPUS-MT pack `en-es` | 66 MB |
+| Italian | OPUS-MT pack `en-it` | 67 MB |
+| Dutch | OPUS-MT pack `en-nl` | 66 MB |
+| Ukrainian | OPUS-MT pack `en-uk` | 65 MB |
+| Czech | OPUS-MT pack `en-cs` | 66 MB |
+| Swedish | OPUS-MT pack `en-sv` | 64 MB |
+| Chinese | OPUS-MT pack `en-zh` | 68 MB |
+
+Speech that is not English is translated through English: Russian speech becomes
+English by Whisper, then the target language by the local pack. A target that
+matches the language you speak keeps the text as it was recognized. Every pack
+runs on your PC with CTranslate2, is verified against `SHA256SUMS.txt` before it
+is installed, and can be removed from Settings to free its 60-68 MB. Packs and
+models are downloaded on demand and never enter the installer.
+
+While translation is on, VoiceType runs a full multilingual model (`medium`,
+`small`, or `base`), because `large-v3-turbo` recognizes speech well but does not
+translate it.
+
 ## Screenshots
 
 The main settings window. The first screen covers the hotkey and the speech
