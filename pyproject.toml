@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voicetype"
-version = "0.3.1"
+version = "0.3.2"
 description = "Local push-to-talk speech-to-text for Windows"
 requires-python = ">=3.12"
 dependencies = []

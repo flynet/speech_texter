@@ -309,10 +309,10 @@ _sentencepiece`; the release build runs the same check.
 ### Build the installer
 
 ```powershell
-iscc /DMyAppVersion=0.3.1 installer\voicetype.iss
+iscc /DMyAppVersion=0.3.2 installer\voicetype.iss
 ```
 
-The result is written to `dist-installer\VoiceType-Setup-0.3.1.exe`.
+The result is written to `dist-installer\VoiceType-Setup-0.3.2.exe`.
 
 ### Build the CUDA pack
 
