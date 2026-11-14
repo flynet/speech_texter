@@ -898,6 +898,22 @@ class TranslationPackTests(unittest.TestCase):
         # then shows up at translation time, not as a startup crash.
         self.assertFalse(hasattr(translation, "spm"))
 
+    def test_a_broken_tokenizer_fails_the_pack_not_the_app(self) -> None:
+        from voicetype import translation
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self._data_dir(Path(tmp)):
+                directory = translation.pack_dir("de")
+                directory.mkdir(parents=True)
+                for name in translation.REQUIRED_PACK_FILES:
+                    (directory / name).write_bytes(b"x")
+                # A hash-named DLL the tokenizer needs is missing, which is the
+                # case the 0.3.0 installer shipped. The pack fails, the module
+                # import does not, so VoiceType starts and dictates.
+                with mock.patch.dict(sys.modules, {"sentencepiece": None}):
+                    with self.assertRaises(ImportError):
+                        translation.get_translator("de")
+
     def test_a_cached_pack_is_reloaded_on_the_next_run(self) -> None:
         from voicetype import translation
 
