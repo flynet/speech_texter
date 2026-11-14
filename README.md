@@ -423,6 +423,11 @@ The pack stage is fast and faithful to the text it is given. The quality risk
 sits in the Whisper stage: a pivoted target inherits every number Whisper
 paraphrased. Translation for meaning, not for verbatim notes.
 
+A second check on 30 s of the same recording measures `en-es`: transcribe 3.29 s,
+translate 2.88 s, pack 0.37 s. Every digit of `1,2,3,4,5` and `60` survives the
+pack stage, which is what the pivot means in practice: the pack keeps the text it
+is given, and the numbers Whisper wrote down are the numbers the user gets.
+
 ## Manual acceptance checklist
 
 - [ ] First run with no internet shows a clear error and opens Settings

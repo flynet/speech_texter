@@ -209,7 +209,9 @@ pack, reference coverage 0.62–0.88, all reference numbers preserved, no empty
 output. A/B on 60 s of real Russian speech with `small` on CPU: `transcribe`
 6.46 s, `translate` 9.45 s (46% slower, invented numbers: spoken
 "60 секунд" became `10 seconds`), pack `en-de` 0.68 s, faithful to its English
-input.
+input. The same recording for 30 s with `en-es`: `transcribe` 3.29 s,
+`translate` 2.88 s, pack 0.37 s, and every digit of `1,2,3,4,5` and `60`
+survives the pack stage.
 
 Acceptance: Russian speech with translation on produces English text; with it
 off, the original language is returned; both selectors act independently; while

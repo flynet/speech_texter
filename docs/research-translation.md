@@ -161,6 +161,11 @@ development machine (Intel Core i5-12500H):
   numbers (spoken `60 секунд` became `10 seconds`, `Разве 3-4-5 вышел` became
   `1,2,3,4,5`), and the pack carried the English numbers through, dropping one
   token (`4`) from `1,2,3,4,5`.
+- A/B on 30 s of the same recording measures `en-es`: `transcribe` 3.29 s,
+  `translate` 2.88 s, pack 0.37 s, and every digit of `1,2,3,4,5` and `60`
+  survives the pack. The pivot inherits the Whisper text exactly: the pack does
+  not add or drop numbers, and the numbers Whisper wrote are the numbers the
+  user gets.
 - Coverage is lower for the morphologically rich targets (ru 0.63, uk 0.62,
   cs 0.66) than for German, French, Dutch, and Swedish (0.82–0.88), because the
   pack picks inflected word forms the reference does not use.
