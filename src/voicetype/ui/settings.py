@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, cuda, hardware, models
+from .. import __version__, cuda, hardware, models, translation
 from ..config import AppConfig
 from ..hotkeys import (
     canonical_vk,
@@ -278,6 +278,102 @@ class ModelRow(QWidget):
             self.download_requested.emit(self.key)
 
 
+class PackRow(QWidget):
+    """One translation pack row: language, status, size, Download/Remove buttons."""
+
+    download_requested = Signal(str)
+    cancel_requested = Signal(str)
+    delete_requested = Signal(str)
+
+    def __init__(
+        self, info: translation.TargetLanguage, parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
+        self.code = info.code
+        self._info = info
+        self._downloading = False
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(8)
+
+        self._name = QLabel(info.display_name)
+        self._name.setMinimumWidth(116)
+        self._name.setToolTip(
+            f"Source model: {info.source_repo}\nLicense: {info.license}"
+        )
+        self._status = QLabel("")
+        self._status.setObjectName("muted")
+        self._status.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._progress = QProgressBar()
+        self._progress.setFixedWidth(120)
+        self._progress.setVisible(False)
+        self._button = QPushButton("Download")
+        self._button.setFixedWidth(90)
+        self._button.clicked.connect(self._on_button)
+        # A pack is 60-84 MB, so an installed pack can be removed to free space.
+        self._remove_button = QPushButton("Remove")
+        self._remove_button.setFixedWidth(80)
+        self._remove_button.setVisible(False)
+        self._remove_button.clicked.connect(self._on_remove_button)
+
+        layout.addWidget(self._name)
+        layout.addWidget(self._status, 1)
+        layout.addWidget(self._progress)
+        layout.addWidget(self._button)
+        layout.addWidget(self._remove_button)
+        self.update_status(translation.pack_status(self.code))
+
+    def update_status(self, status: str) -> None:
+        self._downloading = False
+        self._progress.setVisible(False)
+        self._remove_button.setVisible(False)
+        if status == "installed":
+            self._status.setText("Installed")
+            self._button.setText("Installed")
+            self._button.setEnabled(False)
+            self._remove_button.setVisible(True)
+        elif status == "none":
+            # English comes from Whisper itself, so there is nothing to fetch.
+            self._status.setText("Built into VoiceType")
+            self._button.setText("Installed")
+            self._button.setEnabled(False)
+        else:
+            size = f" (≈ {self._info.size_mb} MB)" if self._info.size_mb else ""
+            self._status.setText(f"Not downloaded{size}")
+            self._button.setText("Download")
+            self._button.setEnabled(True)
+
+    def set_downloading(self, active: bool) -> None:
+        self._downloading = active
+        self._progress.setVisible(active)
+        self._remove_button.setVisible(False)
+        self._button.setText("Cancel" if active else "Download")
+        self._button.setEnabled(True)
+        if active:
+            self._status.setText("Downloading...")
+            self._progress.setRange(0, 0)
+
+    def set_progress(self, done: int, total: int) -> None:
+        if total > 0:
+            self._progress.setRange(0, 100)
+            self._progress.setValue(min(100, int(done * 100 / total)))
+            self._progress.setFormat(
+                f"{done / (1024 * 1024):.0f} / {total / (1024 * 1024):.0f} MB"
+            )
+        else:
+            self._progress.setRange(0, 0)
+            self._progress.setFormat(f"{done / (1024 * 1024):.0f} MB")
+
+    def _on_button(self) -> None:
+        if self._downloading:
+            self.cancel_requested.emit(self.code)
+        else:
+            self.download_requested.emit(self.code)
+
+    def _on_remove_button(self) -> None:
+        self.delete_requested.emit(self.code)
+
+
 class SettingsWindow(QDialog):
     def __init__(self, app, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -309,6 +405,7 @@ class SettingsWindow(QDialog):
 
         layout.addWidget(self._build_dictation_group())
         layout.addWidget(self._build_model_group())
+        layout.addWidget(self._build_translation_group())
         layout.addWidget(self._build_audio_group())
         layout.addWidget(self._build_test_group())
         layout.addWidget(self._build_appearance_group())
@@ -334,6 +431,8 @@ class SettingsWindow(QDialog):
 
         self._app.model_download_progress.connect(self._on_model_progress)
         self._app.model_download_finished.connect(self._on_model_finished)
+        self._app.pack_download_progress.connect(self._on_pack_progress)
+        self._app.pack_download_finished.connect(self._on_pack_finished)
         self._app.cuda_progress.connect(self._on_cuda_progress)
         self._app.cuda_finished.connect(self._on_cuda_finished)
 
@@ -348,6 +447,8 @@ class SettingsWindow(QDialog):
             self._model_combo,
             self._device_combo,
             self._language_combo,
+            self._translate_check,
+            self._target_combo,
             self._mic_combo,
             self._mic_refresh_button,
             self._prompt_edit,
@@ -451,6 +552,60 @@ class SettingsWindow(QDialog):
         )
         self._prompt_edit.setFixedHeight(72)
         layout.addWidget(self._prompt_edit)
+        return group
+
+    def _build_translation_group(self) -> QGroupBox:
+        group = QGroupBox("Translation")
+        form = QFormLayout(group)
+        form.setLabelAlignment(Qt.AlignLeft)
+        form.setHorizontalSpacing(18)
+        form.setVerticalSpacing(8)
+
+        self._translate_check = QCheckBox("Translate the recognized text")
+        form.addRow("", self._translate_check)
+
+        self._target_combo = QComboBox()
+        for info in translation.TARGET_LANGUAGES:
+            self._target_combo.addItem(info.display_name, info.code)
+        form.addRow("Translate to", self._target_combo)
+        self._target_combo.setEnabled(False)
+        self._translate_check.toggled.connect(self._target_combo.setEnabled)
+
+        hint = QLabel(
+            "Whisper turns speech into English text. Every other target uses "
+            "that English text and a local OPUS-MT pack: Russian speech becomes "
+            "English, then German, Chinese, or any other target. The pack runs "
+            "entirely on your PC, and the text is never sent online. A target "
+            "that matches the language you speak keeps the text as it was. While "
+            "translation is on, VoiceType runs a full multilingual model "
+            "(medium, small, or base), because the fast large-v3-turbo model "
+            "recognizes speech well but does not translate, and shows that model "
+            "in the tray. The recognition language above is separate: it tells "
+            "Whisper which language you speak, this option controls the output. "
+            "Translation is weaker than plain recognition: names, numbers, and "
+            "dates can be paraphrased, invented, or dropped, and 2-3 second "
+            "clips often translate poorly, so speak 10-20 seconds. Each pack is "
+            "downloaded on demand, takes 60-84 MB of disk, translates a sentence "
+            "in under 0.1 s on a desktop CPU, and can be removed to free that "
+            "space."
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("muted")
+        form.addRow(hint)
+
+        packs_label = QLabel("Translation packs")
+        packs_label.setObjectName("muted")
+        form.addRow("", packs_label)
+        self._pack_rows: dict[str, PackRow] = {}
+        for info in translation.TARGET_LANGUAGES:
+            if info.asset is None:
+                continue
+            row = PackRow(info)
+            row.download_requested.connect(self._app.request_pack_download)
+            row.cancel_requested.connect(self._app.cancel_pack_download)
+            row.delete_requested.connect(self._app.request_pack_delete)
+            self._pack_rows[info.code] = row
+            form.addRow("", row)
         return group
 
     def _build_audio_group(self) -> QGroupBox:
@@ -626,9 +781,11 @@ class SettingsWindow(QDialog):
             str(self._device_combo.currentData()), "Auto"
         )
         microphone = self._mic_combo.currentText() or "System default"
-        self._test_profile.setText(
-            f"Will test: {model_name} · {device} · {microphone}"
-        )
+        profile = f"Will test: {model_name} · {device} · {microphone}"
+        if self._translate_check.isChecked():
+            target = str(self._target_combo.currentData() or "en")
+            profile += f" · translate to {target.upper()}"
+        self._test_profile.setText(profile)
 
     def _on_test_button(self) -> None:
         if self._tester.state == "recording":
@@ -661,6 +818,8 @@ class SettingsWindow(QDialog):
             self._prompt_edit.toPlainText().strip(),
             self._mic_combo.currentData() or None,
             list(self._app.config.hallucination_phrases),
+            self._translate_check.isChecked(),
+            str(self._target_combo.currentData() or "en"),
         )
         if not started:
             self._app.set_hotkey_capture(False)
@@ -670,6 +829,8 @@ class SettingsWindow(QDialog):
         self._apply_button.setEnabled(not active)
         for widget in self._test_controls:
             widget.setEnabled(not active)
+        # The target language stays disabled while translation is off.
+        self._target_combo.setEnabled(self._translate_check.isChecked() and not active)
         if state == "recording":
             self._test_button.setText("Stop and recognize")
             self._test_button.setEnabled(True)
@@ -753,6 +914,12 @@ class SettingsWindow(QDialog):
             self._hotkey_edit.setText(display)
         self._set_combo_data(self._mode_combo, config.hotkey_mode)
         self._set_combo_data(self._language_combo, config.language)
+        self._translate_check.setChecked(config.translation_enabled)
+        self._set_combo_data(self._target_combo, config.target_language)
+        self._target_combo.setEnabled(
+            self._translate_check.isChecked()
+            and self._tester.state not in {"recording", "processing"}
+        )
         self._max_record_spin.setValue(max(1, config.max_record_seconds // 60))
         self._keep_clipboard_check.setChecked(config.keep_text_in_clipboard)
         self._set_combo_data(self._device_combo, config.device)
@@ -768,6 +935,13 @@ class SettingsWindow(QDialog):
         active_download = self._app.active_model_download
         if active_download is not None:
             row = self._model_rows.get(active_download)
+            if row is not None:
+                row.set_downloading(True)
+        for code, row in self._pack_rows.items():
+            row.update_status(translation.pack_status(code))
+        active_pack = self._app.active_pack_download
+        if active_pack is not None:
+            row = self._pack_rows.get(active_pack)
             if row is not None:
                 row.set_downloading(True)
         self._refresh_cuda()
@@ -869,6 +1043,8 @@ class SettingsWindow(QDialog):
             "hotkey": format_hotkey(keys),
             "hotkey_mode": self._mode_combo.currentData(),
             "language": self._language_combo.currentData(),
+            "translation_enabled": self._translate_check.isChecked(),
+            "target_language": str(self._target_combo.currentData() or "en"),
             "model": model_key,
             "device": self._device_combo.currentData(),
             "microphone": self._mic_combo.currentData() or None,
@@ -913,6 +1089,23 @@ class SettingsWindow(QDialog):
         if row is not None:
             row.update_status(models.model_status(key))
         self._refresh_model_combo()
+        if not ok and message:
+            self._status_label.setText(message)
+
+    def set_pack_downloading(self, target: str, active: bool) -> None:
+        row = self._pack_rows.get(target)
+        if row is not None:
+            row.set_downloading(active)
+
+    def _on_pack_progress(self, target: str, done: int, total: int) -> None:
+        row = self._pack_rows.get(target)
+        if row is not None:
+            row.set_progress(done, total)
+
+    def _on_pack_finished(self, target: str, ok: bool, message: str) -> None:
+        row = self._pack_rows.get(target)
+        if row is not None:
+            row.update_status(translation.pack_status(target))
         if not ok and message:
             self._status_label.setText(message)
 

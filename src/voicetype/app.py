@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal
 from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 
-from . import __version__, autostart, cuda, hardware, models
+from . import __version__, autostart, cuda, hardware, models, translation
 from .config import AppConfig, assets_dir
 from .hotkeys import HotkeyListener
 from .inserter import Inserter
@@ -24,12 +24,15 @@ log = logging.getLogger(__name__)
 
 
 class VoiceTypeApplication(QObject):
-    configure_worker = Signal(str, str, str, str, object, bool)
+    configure_worker = Signal(str, str, str, str, object, bool, bool, str)
     transcribe_requested = Signal(object)
     unload_requested = Signal()
 
     model_download_progress = Signal(str, int, int)
     model_download_finished = Signal(str, bool, str)
+    pack_download_progress = Signal(str, int, int)
+    pack_download_finished = Signal(str, bool, str)
+    pack_delete_finished = Signal(str, bool, str)
     cuda_progress = Signal(int, int)
     cuda_finished = Signal(bool, str)
 
@@ -54,6 +57,8 @@ class VoiceTypeApplication(QObject):
 
         self._model_download_cancel: threading.Event | None = None
         self._model_download_key: str | None = None
+        self._pack_download_cancel: threading.Event | None = None
+        self._pack_download_target: str | None = None
         self._cuda_download_cancel: threading.Event | None = None
         self._update_cancel: threading.Event | None = None
         self._update_info: UpdateInfo | None = None
@@ -118,6 +123,8 @@ class VoiceTypeApplication(QObject):
         self._tray.quit_requested.connect(self.app.quit)
 
         self.model_download_finished.connect(self._on_model_download_finished)
+        self.pack_download_finished.connect(self._on_pack_download_finished)
+        self.pack_delete_finished.connect(self._on_pack_delete_finished)
         self.cuda_finished.connect(self._on_cuda_finished)
 
         self._updater.check_finished.connect(self._on_update_check_finished)
@@ -142,7 +149,11 @@ class VoiceTypeApplication(QObject):
 
     def _configure_from_config(self, retry_cuda: bool = False) -> None:
         try:
-            selection = hardware.resolve_selection(self.config.model, self.config.device)
+            selection = hardware.resolve_selection(
+                self.config.model,
+                self.config.device,
+                self.config.translation_enabled,
+            )
         except hardware.NoModelsAvailable as exc:
             log.error("%s", exc)
             self._state = "error"
@@ -158,8 +169,9 @@ class VoiceTypeApplication(QObject):
         self._state = "loading"
         self._tray.set_state("loading")
         self._tray.set_status_text(
-            f"{models.MODELS[selection.model].display_name} · "
-            f"{selection.device.upper()} · loading"
+            self._status_text(
+                models.MODELS[selection.model].display_name, "loading"
+            )
         )
         self.configure_worker.emit(
             selection.model,
@@ -168,6 +180,8 @@ class VoiceTypeApplication(QObject):
             self.config.initial_prompt,
             self.config.hallucination_phrases,
             retry_cuda or self.config.device == "cuda",
+            self.config.translation_enabled,
+            self.config.target_language,
         )
 
     def _on_model_loading(self, model_key: str, device: str) -> None:
@@ -298,6 +312,14 @@ class VoiceTypeApplication(QObject):
             return self._selection.device.upper()
         return ""
 
+    def _status_text(self, model_name: str | None, suffix: str = "") -> str:
+        """Tray status line: model, device, translation mode, and a suffix."""
+        parts = [model_name, self._device_label()]
+        if self.config.translation_enabled:
+            parts.append(f"translate \u2192 {self.config.target_language.upper()}")
+        parts.append(suffix)
+        return " · ".join(part for part in parts if part)
+
     @property
     def is_busy(self) -> bool:
         return self._state in {"loading", "recording", "processing"}
@@ -310,7 +332,7 @@ class VoiceTypeApplication(QObject):
         self._tray.set_state("idle")
         if self._selection is not None and self._model_loaded:
             name = models.MODELS[self._selection.model].display_name
-            self._tray.set_status_text(f"{name} · {self._device_label()}")
+            self._tray.set_status_text(self._status_text(name))
         else:
             self._tray.set_status_text("")
         self._last_use = time.monotonic()
@@ -336,7 +358,7 @@ class VoiceTypeApplication(QObject):
         self._tray.set_state("idle")
         if self._selection is not None:
             name = models.MODELS[self._selection.model].display_name
-            self._tray.set_status_text(f"{name} · {self._device_label()}")
+            self._tray.set_status_text(self._status_text(name))
         else:
             self._tray.set_status_text("")
         if self._pending_reconfigure:
@@ -374,6 +396,8 @@ class VoiceTypeApplication(QObject):
             "language",
             "initial_prompt",
             "hallucination_phrases",
+            "translation_enabled",
+            "target_language",
         }
         if any(old.get(key) != new.get(key) for key in reconfigure_keys):
             if self._state in {"recording", "processing"}:
@@ -405,6 +429,8 @@ class VoiceTypeApplication(QObject):
                 self.config.initial_prompt,
                 self.config.hallucination_phrases,
                 False,
+                self.config.translation_enabled,
+                self.config.target_language,
             )
 
     def _on_tray_autostart(self, enabled: bool) -> None:
@@ -428,6 +454,8 @@ class VoiceTypeApplication(QObject):
         log.info("Unloading the model after %s minutes of inactivity", minutes)
         self._model_loaded = False
         self.unload_requested.emit()
+        # Translation packs live in this process, not in the worker thread.
+        translation.unload_translators()
         self._tray.set_status_text("Model unloaded (idle)")
 
     # ---------------------------------------------------------------- downloads
@@ -475,6 +503,90 @@ class VoiceTypeApplication(QObject):
     def cancel_model_download(self, key: str | None = None) -> None:
         if self._model_download_cancel is not None:
             self._model_download_cancel.set()
+
+    @property
+    def active_pack_download(self) -> str | None:
+        if self._pack_download_cancel is None:
+            return None
+        return self._pack_download_target
+
+    def request_pack_download(self, target: str) -> None:
+        """Download one translation pack, with a cancel event and progress signal."""
+        if target not in translation.PACKS or self._pack_download_cancel is not None:
+            return
+        cancel = threading.Event()
+        self._pack_download_cancel = cancel
+        self._pack_download_target = target
+        if self._settings is not None:
+            self._settings.set_pack_downloading(target, True)
+
+        def worker() -> None:
+            try:
+                translation.download_pack(
+                    target,
+                    progress=lambda done, total: self.pack_download_progress.emit(
+                        target, done, total
+                    ),
+                    cancel=cancel,
+                )
+            except translation.PackCancelled:
+                self.pack_download_finished.emit(target, False, "Download cancelled.")
+            except Exception as exc:
+                log.exception("Translation pack download failed")
+                self.pack_download_finished.emit(target, False, str(exc))
+            else:
+                self.pack_download_finished.emit(target, True, "")
+
+        threading.Thread(
+            target=worker, daemon=True, name=f"VoiceTypePackDownload-{target}"
+        ).start()
+
+    def cancel_pack_download(self, target: str | None = None) -> None:
+        if self._pack_download_cancel is not None:
+            self._pack_download_cancel.set()
+
+    def request_pack_delete(self, target: str) -> None:
+        """Remove one installed translation pack, unloading it before deleting."""
+        if target not in translation.PACKS:
+            return
+
+        def worker() -> None:
+            try:
+                translation.delete_pack(target)
+            except Exception as exc:
+                log.exception("Translation pack removal failed")
+                self.pack_delete_finished.emit(target, False, str(exc))
+            else:
+                self.pack_delete_finished.emit(target, True, "")
+
+        threading.Thread(
+            target=worker, daemon=True, name=f"VoiceTypePackDelete-{target}"
+        ).start()
+
+    def _on_pack_delete_finished(self, target: str, ok: bool, message: str) -> None:
+        if self._settings is not None:
+            self._settings.refresh()
+        info = translation.target_info(target)
+        name = info.display_name if info is not None else target
+        if ok:
+            self._tray.notify(
+                "Translation pack removed", f"The {name} pack files were deleted."
+            )
+        elif message:
+            self._tray.notify("Translation pack removal failed", message)
+
+    def _on_pack_download_finished(self, target: str, ok: bool, message: str) -> None:
+        self._pack_download_cancel = None
+        self._pack_download_target = None
+        if self._settings is not None:
+            self._settings.set_pack_downloading(target, False)
+            self._settings.refresh()
+        info = translation.target_info(target)
+        name = info.display_name if info is not None else target
+        if ok:
+            self._tray.notify("Translation pack downloaded", f"{name} is ready to use.")
+        elif message:
+            self._tray.notify("Translation pack download failed", message)
 
     def _on_model_download_finished(self, key: str, ok: bool, message: str) -> None:
         self._model_download_cancel = None
@@ -719,6 +831,8 @@ class VoiceTypeApplication(QObject):
             self._recorder.stop()
         if self._model_download_cancel is not None:
             self._model_download_cancel.set()
+        if self._pack_download_cancel is not None:
+            self._pack_download_cancel.set()
         if self._cuda_download_cancel is not None:
             self._cuda_download_cancel.set()
         if self._update_cancel is not None:
@@ -731,4 +845,5 @@ class VoiceTypeApplication(QObject):
         if self._settings is not None:
             self._settings.shutdown()
             self._settings.hide()
+        translation.unload_translators()
         self._tray.hide()

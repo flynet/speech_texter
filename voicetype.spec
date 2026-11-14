@@ -95,6 +95,8 @@ for package in (
     "tokenizers",
     "pynput",
     "huggingface_hub",
+    # Translation packs need the SentencePiece tokenizer shipped as a module.
+    "sentencepiece",
 ):
     package_datas, package_binaries, package_hiddenimports = collect_all(package)
     datas += package_datas

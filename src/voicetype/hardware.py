@@ -131,7 +131,7 @@ def _best_available(available: list[str]) -> str:
     raise NoModelsAvailable("No speech models are installed")
 
 
-def resolve_selection(model_pref: str, device_pref: str) -> Selection:
+def resolve_selection(model_pref: str, device_pref: str, translate: bool = False) -> Selection:
     available = models.available_models()
     if not available:
         raise NoModelsAvailable(
@@ -162,7 +162,25 @@ def resolve_selection(model_pref: str, device_pref: str) -> Selection:
             device = "cuda"
             reason = "NVIDIA GPU with CUDA detected"
 
-    if model_pref != "auto":
+    if translate:
+        # Translation is a full multilingual task, so the fast distilled turbo
+        # model is skipped: it keeps the source language.
+        usable = [key for key in models.TRANSLATION_MODEL_ORDER if key in available]
+        if not usable:
+            raise NoModelsAvailable(
+                "Translation needs a full multilingual model. Download medium, "
+                "small, or base in Settings."
+            )
+        if model_pref in usable:
+            model = model_pref
+            reason += f"; model {model_pref} selected in settings"
+        elif model_pref != "auto":
+            model = usable[0]
+            reason += f"; {model_pref} does not translate, using {model}"
+        else:
+            model = usable[0]
+            reason += f"; translation uses {model}"
+    elif model_pref != "auto":
         if model_pref in available:
             model = model_pref
             reason += f"; model {model_pref} selected in settings"

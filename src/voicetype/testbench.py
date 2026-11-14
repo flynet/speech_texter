@@ -13,7 +13,7 @@ import time
 import numpy as np
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
 
-from . import hardware, models
+from . import hardware, models, translation
 from .recorder import Recorder
 from .transcriber import TranscriptionWorker
 
@@ -26,7 +26,7 @@ MIN_TEST_SECONDS = 0.5
 class RecognitionTester(QObject):
     """Record a sample, transcribe it with an unsaved profile, report the text."""
 
-    configure_requested = Signal(str, str, str, str, object, bool)
+    configure_requested = Signal(str, str, str, str, object, bool, bool, str)
     transcribe_requested = Signal(object)
     unload_requested = Signal()
     quit_requested = Signal()
@@ -45,6 +45,8 @@ class RecognitionTester(QObject):
         self._model_key: str | None = None
         self._device = "cpu"
         self._language = "ru"
+        self._translate = False
+        self._target_language = "en"
         self._prompt = ""
         self._blacklist: list[str] = []
         self._microphone = "System default"
@@ -96,6 +98,8 @@ class RecognitionTester(QObject):
         prompt: str,
         microphone: str | None,
         blacklist: list[str],
+        translate: bool = False,
+        target_language: str = "en",
     ) -> bool:
         if self._closed or self._state in {"recording", "processing"}:
             return False
@@ -113,7 +117,7 @@ class RecognitionTester(QObject):
                 return False
 
         try:
-            selection = hardware.resolve_selection(model_pref, device_pref)
+            selection = hardware.resolve_selection(model_pref, device_pref, bool(translate))
         except Exception as exc:
             log.exception("Could not resolve the test profile")
             self._report_error(f"Could not choose a model or device: {exc}")
@@ -129,6 +133,8 @@ class RecognitionTester(QObject):
         self._model_key = selection.model
         self._device = selection.device
         self._language = language
+        self._translate = bool(translate)
+        self._target_language = target_language
         self._prompt = prompt
         self._blacklist = [str(item) for item in blacklist]
         self._microphone = microphone or "System default"
@@ -149,6 +155,8 @@ class RecognitionTester(QObject):
             self._prompt,
             self._blacklist,
             device_pref == "cuda",
+            self._translate,
+            self._target_language,
         )
         return True
 
@@ -314,7 +322,12 @@ class RecognitionTester(QObject):
         info = models.MODELS.get(display)
         if info is not None:
             display = info.display_name
-        return (
+        meta = (
             f"{display} · {self._device.upper()} · {self._microphone} · "
             f"{elapsed:.1f} s · RTF {rtf:.2f}"
         )
+        if self._translate:
+            info = translation.target_info(self._target_language)
+            name = info.display_name if info is not None else self._target_language
+            meta += f" · translated to {name}"
+        return meta

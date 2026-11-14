@@ -12,6 +12,9 @@ CTranslate2.
 
 - Global hotkey (push-to-talk by default, toggle mode available)
 - Local Russian, English, or automatic language recognition
+- Optional offline translation: any language to English with Whisper, and to
+  Russian, German, French, Spanish, Italian, Dutch, Ukrainian, Czech, Swedish,
+  or Chinese with a downloadable local OPUS-MT pack
 - Automatic GPU detection with a safe CPU fallback
 - Tray icon, no main window, and a small always-on-top recording overlay
 - Model manager: `base`, `small`, `medium`, and `large-v3-turbo`
@@ -27,11 +30,11 @@ CTranslate2.
 ## Screenshots
 
 The main settings window. The first screen covers the hotkey and the speech
-model; the second shows audio, overlay, and system options.
+model; the second shows translation, audio, and the test bench.
 
 ![VoiceType settings: dictation and speech model](docs/screenshots/settings-dictation.png)
 
-![VoiceType settings: audio, test bench, appearance, and system](docs/screenshots/settings-audio-system.png)
+![VoiceType settings: translation, audio, test bench, and appearance](docs/screenshots/settings-translation-audio.png)
 
 The tray menu and the recording overlay that appears while the hotkey is held:
 
@@ -72,7 +75,16 @@ Choose **More info → Run anyway** after verifying the checksum.
 1. Open **Settings** from the tray icon.
 2. Click the hotkey field and press the desired combination (default:
    `Ctrl+Alt+Space`). A single `F1`–`F24` key or `Space` can also be used.
-3. Choose the language and, optionally, a microphone.
+3. Choose the language and, optionally, a microphone. To translate the recognized
+   text, enable **Translate the recognized text** and pick **Translate to**; the
+   target selector is a separate setting from the language you speak. English is
+   produced by Whisper itself, with no extra download. Every other target runs on
+   a local OPUS-MT pack, so download its **Translation packs** row in Settings
+   first: speech is turned into English by Whisper, then into the target by the
+   pack, so Russian speech becomes German, Chinese, or any other target through
+   English. While translation is on, VoiceType runs a full multilingual model
+   (`medium`, `small`, or `base`), because the fast `large-v3-turbo` model
+   recognizes speech well but does not translate it.
 4. Click **Apply**.
 5. Focus any text field (Notepad, a browser, a chat app) and hold the hotkey.
    Speak while holding it, then release. The recognized text is pasted into the
@@ -108,7 +120,10 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 | --- | --- |
 | **Hotkey** | Global combination that starts recording. Press a modifier combination (for example `Ctrl+Alt+Space`) or a single `F1`–`F24` / `Space` key. The hotkey works in every application and does not take focus away from the window you are typing in. |
 | **Mode** | `Push-to-talk (hold)` records while the key is held and stops on release. `Toggle` starts recording on the first press and stops it on the second. |
-| **Language** | Recognition language: Russian, English, or `Auto`. Auto detects the language for every recording and can handle mixed speech, but it is slightly less predictable for short phrases. |
+| **Language** | Recognition language: Russian, English, or `Auto`. Auto detects the language for every recording and can handle mixed speech, but it is slightly less predictable for short phrases. This setting tells Whisper **which language you speak**; it is separate from translation. |
+| **Translate the recognized text** | Off by default. When enabled, VoiceType converts the recognized text into the target language. English comes from the built-in Whisper `translate` task, running fully offline with no extra download. Every other target runs on a local OPUS-MT pack through English. Translation needs a full multilingual model, so while this option is on VoiceType uses `medium`, `small`, or `base` and shows that model in the tray, even if `large-v3-turbo` was selected for plain recognition. If the target matches the language you speak, the text is kept as it was recognized. |
+| **Translate to** | Target language: English, Russian, German, French, Spanish, Italian, Dutch, Ukrainian, Czech, Swedish, Chinese. English needs no download; the other languages use a pack from the list below. The selector is enabled only while translation is on, and is separate from the **Language** you speak. |
+| **Translation packs** | Pack manager: one row per target language with its size (60-84 MB), a **Download** button with progress and cancel, and **Remove** for an installed pack. Packs are converted OPUS-MT models in the CTranslate2 format, verified against `SHA256SUMS.txt`, stored in `%LOCALAPPDATA%\VoiceType\translation`, and used only on your PC. |
 | **Maximum recording** | Hard limit from 1 to 60 minutes (10 by default). Recording also stops when the hotkey is released in push-to-talk mode. Recordings shorter than 0.3 seconds are ignored. |
 | **Keep the recognized text in the clipboard** | When enabled (default), the last transcription stays on the clipboard, so if the paste target had no focus you can click the field and press `Ctrl+V`. Disable it to restore the previous clipboard content after each automatic insertion. |
 | **Device** | `Auto` uses CUDA when a usable NVIDIA GPU and the CUDA pack are available, otherwise the CPU. `CUDA (NVIDIA)` forces the GPU when possible and falls back to the CPU if CUDA cannot be initialized. `CPU` always uses the processor. |
@@ -117,7 +132,7 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 | **Models** | Model manager. `Small` is bundled with the installer and marked `Bundled`/`Installed`. Other models show `Not downloaded` with a **Download** button; an active download can be cancelled. |
 | **Initial prompt / vocabulary** | Optional text passed to Whisper before recognition. Add names, product terms, abbreviations, or unusual spellings to make them more likely to be recognized correctly. Keep it short; a long prompt may bias the output. |
 | **Microphone** | Input device. `System default` follows the Windows default device; choosing a specific microphone overrides it. **Refresh** re-scans the device list after connecting or disconnecting a microphone. |
-| **Test model and microphone** | A demo bench next to the microphone selector. Press **Start test**, speak for up to 30 seconds, press **Stop and recognize**: the recognized text appears with the model, device, microphone, duration and RTF of that run. It uses the values selected above **without saving them**, so you can compare models and microphones freely, then press **Apply** once at the end. Global hotkeys are paused while testing, and the main dictation pipeline is left untouched. |
+| **Test model and microphone** | A demo bench next to the microphone selector. Press **Start test**, speak for up to 30 seconds, press **Stop and recognize**: the recognized text appears with the model, device, microphone, duration and RTF of that run, plus `translated to German` when translation is on. It uses the values selected above **without saving them**, so you can compare models, microphones, and translation modes freely, then press **Apply** once at the end. Global hotkeys are paused while testing, and the main dictation pipeline is left untouched. |
 | **Sounds** | Plays a short tone when recording starts and a different one when it stops. |
 | **Overlay position** | Where the recording overlay appears: bottom center (default), bottom left, bottom right, or top center. The overlay ignores mouse input and never takes focus. |
 | **Start with Windows** | Adds or removes a per-user `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry. No administrator rights are required. |
@@ -258,10 +273,10 @@ Copy-Item -Recurse -Force models\small dist\VoiceType\models\small
 ### Build the installer
 
 ```powershell
-iscc /DMyAppVersion=0.2.1 installer\voicetype.iss
+iscc /DMyAppVersion=0.3.0 installer\voicetype.iss
 ```
 
-The result is written to `dist-installer\VoiceType-Setup-0.2.1.exe`.
+The result is written to `dist-installer\VoiceType-Setup-0.3.0.exe`.
 
 ### Build the CUDA pack
 
@@ -274,6 +289,21 @@ extracts the Windows DLLs, creates `voicetype-cuda-pack.zip`, and writes
 `SHA256SUMS.txt`. The **CUDA pack** GitHub Actions workflow (tag
 `cuda-pack-v*` or manual dispatch) publishes the result as release
 `cuda-pack-v1`.
+
+### Build the translation packs
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_mt_packs.py --dist dist-mt-packs
+```
+
+This converts every pinned Helsinki OPUS-MT model to CTranslate2 `int8`, adds
+the two Marian options the HF converter leaves out (`model_type`,
+`add_source_eos`), writes `NOTICE.txt` and `SOURCE.json` into each archive, and
+creates `SHA256SUMS.txt`. Each pack is 60–84 MB. The **Translation packs**
+workflow (tag `mt-packs-v*` or manual dispatch) publishes the archives as
+release `mt-packs-v1`. VoiceType downloads a pack on demand from Settings,
+verifies its SHA-256 against `SHA256SUMS.txt`, and installs it in
+`%LOCALAPPDATA%\VoiceType\translation`; packs never enter the installer.
 
 ## Benchmarks
 
@@ -315,6 +345,45 @@ The curated CUDA pack is 642.6 MB compressed (919.2 MB uncompressed) and was
 verified with `small`, `medium`, and `large-v3-turbo`. The PyInstaller application
 directory is 336.4 MB without models.
 
+### Translation packs
+
+`scripts/bench_translation.py` measures cold pack load, CPU latency, memory, and
+reference coverage on 20 fixed dictation phrases (175 words), with human
+translations as references, on the same machine, CPU only, 4 threads, `int8`,
+3 passes:
+
+| Pack | Load | Latency | Per word | Memory | Coverage |
+| --- | --- | --- | --- | --- | --- |
+| `en-ru` | 0.28 s | 0.06 s / phrase | 6.5 ms | 100 MB | 0.63 |
+| `en-de` | 0.31 s | 0.06 s / phrase | 6.7 ms | 91 MB | 0.85 |
+| `en-fr` | 0.31 s | 0.06 s / phrase | 7.2 ms | 93 MB | 0.88 |
+| `en-es` | 0.30 s | 0.06 s / phrase | 7.3 ms | 96 MB | 0.82 |
+| `en-it` | 0.35 s | 0.07 s / phrase | 8.4 ms | 105 MB | 0.76 |
+| `en-nl` | 0.33 s | 0.06 s / phrase | 7.3 ms | 98 MB | 0.83 |
+| `en-uk` | 0.34 s | 0.06 s / phrase | 6.6 ms | 94 MB | 0.62 |
+| `en-cs` | 0.32 s | 0.06 s / phrase | 7.3 ms | 94 MB | 0.66 |
+| `en-sv` | 0.31 s | 0.05 s / phrase | 5.9 ms | 91 MB | 0.83 |
+| `en-zh` | 0.32 s | 0.05 s / phrase | 6.0 ms | 100 MB | 0.72 |
+
+Coverage counts the reference words, digits, and Chinese characters the
+translation kept, so it underestimates Russian, Ukrainian, and Czech, where the
+pack picks different word forms than the reference. Every number in the
+references was preserved, no output was empty, and one loaded pack uses about
+100 MB of RAM.
+
+The A/B check on 60 s of real Russian speech (`small` on CPU, `language=ru`)
+measures the three stages against each other:
+
+| Stage | Time | What it did |
+| --- | --- | --- |
+| `task="transcribe"` | 6.46 s | Russian text, faithful to the recording |
+| `task="translate"` | 9.45 s | English text, 46% slower, invented and dropped numbers: spoken "60 секунд" became `10 seconds`, spoken `Разве 3-4-5 вышел` became `1,2,3,4,5`, "рейтинг 4,2 из 5 946 голосов" became `the ZGB is a 4.2-inch instrument from 5,946` |
+| OPUS-MT `en-de` pack | 0.68 s | German text from the English stage, numbers carried through, one token (`4`) dropped from `1,2,3,4,5` |
+
+The pack stage is fast and faithful to the text it is given. The quality risk
+sits in the Whisper stage: a pivoted target inherits every number Whisper
+paraphrased. Translation for meaning, not for verbatim notes.
+
 ## Manual acceptance checklist
 
 - [ ] First run with no internet shows a clear error and opens Settings
@@ -327,6 +396,15 @@ directory is 336.4 MB without models.
 - [ ] New recordings are ignored while the overlay shows `Processing`
 - [ ] CPU mode works on a machine without an NVIDIA GPU
 - [ ] CUDA mode falls back to CPU if the CUDA pack is missing or broken
+- [ ] With **Translate the recognized text** on, Russian speech becomes English text; with it off, the original language output is returned
+- [ ] With translation on, the tray status shows a full multilingual model (`medium`, `small`, or `base`) and `translate → EN` for an English target, not `large-v3-turbo`
+- [ ] The tray shows the selected target (`translate → DE` for German), and the test bench result names it
+- [ ] The **Language** selector and the translation target selector act independently
+- [ ] A target that needs a pack reports the missing pack before Whisper loads, and its row in Settings downloads it with progress and cancel
+- [ ] Russian speech with target German gives German text through the English stage; English speech with target Russian gives Russian text
+- [ ] A target that matches the spoken language keeps the recognized text as it was
+- [ ] **Remove** deletes an installed pack, the row goes back to **Download**, and the disk space is freed
+- [ ] Hovering a pack row shows its source model and license
 - [ ] Autostart toggles survive a reboot / sign-out
 - [ ] Single instance: launching a second copy shows a message
 - [ ] Update check finds the latest release and verifies SHA-256
@@ -348,6 +426,10 @@ directory is 336.4 MB without models.
   **Refresh**.
 - **CUDA errors.** Check `%LOCALAPPDATA%\VoiceType\logs\app.log`. VoiceType
   should fall back to CPU automatically; you can also set **Device** to **CPU**.
+- **Translation stops with "pack is not downloaded".** A target other than
+  English needs its local pack. Open Settings, press **Download** on the row for
+  that language, and dictate again. If the target matches the language you speak,
+  the recognized text is kept as it was.
 - **Antivirus warnings.** PyInstaller executables are sometimes flagged. Verify
   the SHA-256 checksum and add an exclusion only if you trust the release.
 
@@ -361,15 +443,62 @@ for:
 
 - downloading models from Hugging Face;
 - downloading the optional CUDA pack from GitHub Releases;
+- downloading translation packs from GitHub Releases;
 - checking for updates on GitHub.
+
+Translation into English uses the same local Whisper model, so no audio or text
+is sent anywhere for it. Other target languages run a local OPUS-MT pack on your
+own PC: the pack download is the only network call, and the text that is
+translated never leaves the machine.
 
 ## Limitations
 
 - Windows only (global hotkeys, clipboard integration, and installer are
   Windows-specific).
+- Every target except English runs through English: Whisper turns speech into
+  English text, a local OPUS-MT pack turns that text into the target language.
+  Russian→German directly is not available, because OPUS-MT has no usable
+  Russian–German pair. Two stages mean two chances to lose a detail, and the
+  pack adds 0.05–0.07 s per phrase.
+- A non-English target needs its pack downloaded once (60–84 MB per language).
+  VoiceType stops with a clear message when the pack is missing, and **Remove**
+  in Settings frees the space again.
+- The ten packs in Settings cover the targets that OPUS-MT provides as a direct
+  English pair. Polish, Turkish, Japanese, and Korean have no such pair with a
+  usable language token, so they are not in the list.
+- Translation quality is lower than plain recognition: names, numbers, and dates
+  can be paraphrased, invented, or dropped. Enable it when meaning matters more
+  than exact wording, and keep it off for verbatim notes.
+- Translation needs full multilingual models: `large-v3-turbo` recognizes speech
+  very well but keeps the source language, so VoiceType runs `medium`, `small`,
+  or `base` while translation is on. If none of them is downloaded, VoiceType
+  reports it and asks for a download in Settings.
+- Whisper translation needs enough speech to work with: two- and three-second
+  clips are often translated poorly, sometimes into a single word. Speak
+  10–20 seconds for usable English output.
 - Text insertion uses the clipboard and a synthetic `Ctrl+V`, so the target
   application must support pasting.
 - With the clipboard fallback enabled (default), the transcription replaces the
   previous plain-text clipboard content. Disable the option to restore it after
   each insertion; non-text clipboard formats are not preserved.
 - The application is not code-signed.
+
+## License
+
+The VoiceType source is MIT — see [LICENSE](LICENSE).
+
+Third-party parts keep their own licenses, and nothing non-commercial is used:
+
+| Component | License |
+| --- | --- |
+| faster-whisper, Whisper models | MIT |
+| CTranslate2 | MIT |
+| PySide6 / Qt | LGPL-3.0, dynamically linked |
+| sounddevice | LGPL-2.1 |
+| pynput, huggingface-hub, requests | MIT / Apache-2.0 |
+| numpy, psutil | BSD |
+| OPUS-MT / Tatoeba-Challenge source models (`Helsinki-NLP/opus-mt-en-*`), converted to CTranslate2 by `scripts/build_mt_packs.py` | Apache-2.0, `opus-mt-en-de` is CC-BY-4.0 |
+| sentencepiece | Apache-2.0 |
+
+Models under a non-commercial license (for example NLLB, CC-BY-NC-4.0) are not
+compatible with this project, so they are not part of the plan.

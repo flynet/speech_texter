@@ -25,7 +25,7 @@ from PySide6.QtWidgets import QApplication, QGroupBox, QScrollArea
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from voicetype import cuda, hardware, models  # noqa: E402
+from voicetype import cuda, hardware, models, translation  # noqa: E402
 from voicetype.config import AppConfig  # noqa: E402
 from voicetype.recorder import Recorder  # noqa: E402
 from voicetype.ui import theme  # noqa: E402
@@ -42,6 +42,8 @@ class DemoApplication(QObject):
 
     model_download_progress = Signal(str, int, int)
     model_download_finished = Signal(str, bool, str)
+    pack_download_progress = Signal(str, int, int)
+    pack_download_finished = Signal(str, bool, str)
     cuda_progress = Signal(int, int)
     cuda_finished = Signal(bool, str)
 
@@ -59,11 +61,17 @@ class DemoApplication(QObject):
             idle_unload_minutes=0,
             overlay_position="bottom-center",
             autostart=False,
+            translation_enabled=True,
+            target_language="en",
         )
         self.config.normalize()
 
     @property
     def active_model_download(self) -> None:
+        return None
+
+    @property
+    def active_pack_download(self) -> str | None:
         return None
 
     @property
@@ -77,6 +85,15 @@ class DemoApplication(QObject):
         pass
 
     def cancel_model_download(self, key: str | None = None) -> None:
+        pass
+
+    def request_pack_download(self, target: str) -> None:
+        pass
+
+    def cancel_pack_download(self, target: str | None = None) -> None:
+        pass
+
+    def request_pack_delete(self, target: str) -> None:
         pass
 
     def download_cuda_pack(self) -> None:
@@ -96,6 +113,8 @@ def _prepare_demo_environment() -> None:
     """Replace hardware and microphone lookups with neutral demo values."""
     models.is_available = lambda key: key == "small"
     models.model_status = lambda key: "bundled" if key == "small" else "missing"
+    # Screenshots must not depend on which packs this machine happens to have.
+    translation.pack_status = lambda code: "installed" if code == "ru" else "missing"
     hardware.detect_nvidia_gpus = lambda: []
     hardware.cuda_available = lambda: False
     cuda.cuda_pack_installed = lambda: False
@@ -111,7 +130,8 @@ def _decorate_test_group(window: SettingsWindow) -> None:
         "Проверка модели и микрофона: речь распознана полностью."
     )
     window._test_meta.setText(
-        "Small (base.en) · CPU · Microphone (USB Audio Device) · 3.4 s · RTF 0.48"
+        "Small (base.en) · CPU · Microphone (USB Audio Device) · 3.4 s · "
+        "RTF 0.48 · translated to English"
     )
     window._test_copy.setEnabled(True)
     window._test_clear.setEnabled(True)
@@ -128,14 +148,20 @@ def _settings_screenshots(app: QApplication) -> None:
     scroll = window.findChild(QScrollArea)
     if scroll is not None:
         bar = scroll.verticalScrollBar()
-        audio = next(
-            (group for group in window.findChildren(QGroupBox) if group.title() == "Audio"),
+        # Scroll to the translation group so the shot covers translation, audio,
+        # and the test bench in one frame.
+        anchor = next(
+            (
+                group
+                for group in window.findChildren(QGroupBox)
+                if group.title() == "Translation"
+            ),
             None,
         )
         _decorate_test_group(window)
-        bar.setValue(audio.y() - 12 if audio is not None else bar.maximum())
+        bar.setValue(anchor.y() - 12 if anchor is not None else bar.maximum())
         QTest.qWait(250)
-        window.grab().save(str(OUTPUT / "settings-audio-system.png"), "PNG")
+        window.grab().save(str(OUTPUT / "settings-translation-audio.png"), "PNG")
 
     window.shutdown()
     window.close()

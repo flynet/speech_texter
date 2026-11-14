@@ -98,6 +98,11 @@ MODELS: dict[str, ModelInfo] = {
 
 MODEL_ORDER = ("large-v3-turbo", "medium", "small", "base")
 
+# Whisper's distilled turbo models are tuned for transcription: with
+# task="translate" they usually return the source language, not English.
+# Translation needs one of these full multilingual models, best quality first.
+TRANSLATION_MODEL_ORDER = ("medium", "small", "base")
+
 
 class DownloadCancelled(Exception):
     """Raised when the user cancels a model download."""

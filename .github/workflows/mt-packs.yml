@@ -1,0 +1,66 @@
+name: Translation packs
+
+on:
+  push:
+    tags:
+      - "mt-packs-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mt-packs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the converter
+        # Build-time tools only: VoiceType ships ctranslate2 and sentencepiece,
+        # so torch is installed from the CPU index to keep the download small.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ctranslate2==4.8.5 transformers==5.23.0 sentencepiece==0.2.3 requests==2.34.2
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Build translation packs
+        run: python scripts/build_mt_packs.py --dist dist-mt-packs
+
+      - name: Remove an existing mt-packs-v1 release
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete mt-packs-v1 --yes --cleanup-tag
+
+      - name: Publish translation packs
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mt-packs-v1
+          name: VoiceType translation packs v1
+          body: |
+            Local OPUS-MT translation packs for VoiceType, one per target language.
+            Each archive is converted from a Helsinki-NLP OPUS-MT model to
+            CTranslate2 int8 and verified against `SHA256SUMS.txt` by the app.
+            Packs are downloaded on demand from Settings into
+            `%LOCALAPPDATA%\VoiceType\translation` and never enter the installer;
+            translation runs fully offline.
+
+            Source models: OPUS-MT / Tatoeba-Challenge, University of Helsinki
+            (Apache-2.0, `opus-mt-en-de` is CC-BY-4.0).
+          draft: false
+          prerelease: false
+          files: |
+            dist-mt-packs/*.zip
+            dist-mt-packs/SHA256SUMS.txt

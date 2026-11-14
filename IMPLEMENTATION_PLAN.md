@@ -1,4 +1,4 @@
-﻿# VoiceType — Implementation Plan
+# VoiceType — Implementation Plan
 
 This document fixes the implementation decisions for the VoiceType desktop app.
 The source requirements are in `Техплан VoiceType — локальный голосовой ввод для Windows.md`.
@@ -20,8 +20,10 @@ The source requirements are in `Техплан VoiceType — локальный 
 | CUDA pack | Separate release `cuda-pack-v1`; `nvidia-cublas-cu12==12.9.2.10`, `nvidia-cudnn-cu12==9.9.0.52` |
 | UI / README | English |
 | Clipboard | Save and restore **text only**; documented limitation |
+| License | **MIT** in `LICENSE`. Non-commercial models (CC-BY-NC, for example NLLB) are not used |
 | Uninstall | User config and models are kept |
 | Autostart | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
+| Translation | Off by default. Phase 1 uses the Whisper `translate` task, which turns speech into **English** only. Other target languages need local translation packs, downloaded on demand, never bundled |
 | Overlay position | Presets: bottom-center (default), bottom-left, bottom-right, top-center |
 
 ## 2. Project layout
@@ -149,6 +151,71 @@ Acceptance: overlay under 100 ms, focus preserved, settings apply live, single i
 - `cuda-pack.yml` on `cuda-pack-v*` or manual dispatch: publish `cuda-pack-v1`.
 - Publish `v0.1.0` and verify the installer on clean Windows 11.
 
+### Stage 7 — Translation
+
+Phase 1 (done):
+
+- `config.py`: `translation_enabled` (off) and `target_language` (`en` default),
+  `TRANSLATION_TARGETS` as a literal kept in sync with `translation.TARGETS` by a
+  test, `CONFIG_VERSION = 2`, clamped in `normalize()`.
+- `transcriber.py`: `configure(..., translate, target_language)`;
+  `translation_plan` picks the stage, so `task="translate"` runs for an English
+  target and for a pivoted target, and plain transcription runs for English
+  speech and for the `none` plan.
+- `ui/settings.py`: **Translation** group between the model and audio groups —
+  checkbox + separate target selector; the **Language** selector stays independent.
+- `models.TRANSLATION_MODEL_ORDER = ("medium", "small", "base")` and
+  `hardware.resolve_selection(..., translate)`: with translation on, the fast
+  distilled model is skipped. Measured on `tests/audio/ru_60s.wav` (CUDA,
+  `int8_float16`), `large-v3-turbo` with `task="translate"` returned Russian
+  (`Что тут еще нужно говорить? Я ебу.`), while `base`, `small`, and `medium`
+  returned English (`What else do you need to say? I will eat.`).
+- Test bench passes translation through, the profile line shows `translate to DE`
+  and the result meta names the target (`translated to German`); the tray status
+  shows `translate → DE`.
+
+Phase 2 (done, see `docs/research-translation.md`):
+
+- `sentencepiece==0.2.3` (Apache-2.0) in `requirements.txt` and
+  `collect_all("sentencepiece")` in `voicetype.spec`.
+- `translation.py`: `TARGET_LANGUAGES` registry (10 packs + English),
+  `REQUIRED_PACK_FILES` (`model.bin`, `config.json`, `source.spm`, `target.spm`),
+  SHA-256-verified on-demand download from release `mt-packs-v1`, safe zip
+  extraction, cached `PackTranslator` (spm + `ctranslate2.Translator`, CPU int8,
+  chunks of ≤40 words, decode cap `min(4 × source, 128)` tokens), idle unload,
+  `forget_translator`, `delete_pack`.
+- Packs are converted from `Helsinki-NLP/opus-mt-en-*` by
+  `scripts/build_mt_packs.py` (`int8`, 60–84 MB each) with `NOTICE.txt` and
+  `SOURCE.json`, published by `.github/workflows/mt-packs.yml` as `mt-packs-v1`.
+  Pre-converted `gaudi` packs are not used: the project runs the converter
+  itself, because Marian needs `model_type=marian` and `add_source_eos` that the
+  published packs do not carry, and without them the decoder loops.
+- `translation_plan(source, target)` returns `whisper`, `mt`, `pivot`, or `none`;
+  `TranscriptionWorker` runs the pack after Whisper for `mt` and `pivot`, so
+  Russian speech reaches German through English, and English speech reaches
+  Russian without the Whisper translate task.
+- `ui/settings.py`: pack rows with size, **Download**, progress, cancel,
+  **Remove**; `app.py` runs downloads and removals off the UI thread, and the
+  test bench reports the target language in the result meta.
+- License: the project is MIT and no CC-BY-NC model is used. `opus-mt-en-de` is
+  CC-BY-4.0, the rest Apache-2.0; NLLB stays out of the plan.
+
+Measured on the development machine (CPU only, 4 threads, `int8`), 20 dictation
+phrases, 175 words, 3 passes, `scripts/bench_translation.py`: cold pack load
+0.28–0.35 s, 0.05–0.07 s per phrase (5.9–8.4 ms per word), 91–105 MB per loaded
+pack, reference coverage 0.62–0.88, all reference numbers preserved, no empty
+output. A/B on 60 s of real Russian speech with `small` on CPU: `transcribe`
+6.46 s, `translate` 9.45 s (46% slower, invented numbers: spoken
+"60 секунд" became `10 seconds`), pack `en-de` 0.68 s, faithful to its English
+input.
+
+Acceptance: Russian speech with translation on produces English text; with it
+off, the original language is returned; both selectors act independently; while
+translation is on, the tray shows a full multilingual model, not
+`large-v3-turbo`; a target that needs a pack reports it before Whisper loads;
+**Remove** frees the pack files; a target equal to the spoken language keeps the
+recognized text.
+
 ## 5. Known risks and checks
 
 1. `ctranslate2 4.8.5` + CUDA 12.9 + cuDNN 9.9 on Windows.
@@ -161,6 +228,26 @@ Acceptance: overlay under 100 ms, focus preserved, settings apply live, single i
 6. Idle RAM ≤600 MB with `small`. Measured working set after CUDA model load:
    ~450 MB (frozen build, `large-v3-turbo`, 20 s after start).
 7. Exact 2 GB VRAM behavior cannot be measured on the 8 GB development machine.
+8. Whisper translation is weaker supervision than transcription: names, numbers,
+   and dates can be paraphrased or invented. Measured A/B on 60 s of real Russian
+   speech (`small`, CPU): translate is 46% slower than transcribe and invented
+   numbers (spoken `60 секунд` became `10 seconds`, `Разве 3-4-5 вышел` became
+   `1,2,3,4,5`). Documented in the README; the pack stage keeps the numbers of
+   the text it is given.
+9. Non-English pairs are sparse in the OPUS-MT catalog, so most of them need the
+   English pivot: two stages, extra latency, quality loss. Measured pack CPU cost
+   is 0.05–0.07 s per phrase, under a second per dictation run, and a pack is
+   60–84 MB in `int8`, not the ~150 MB of the published HF conversions.
+10. Distilled Whisper models keep the source language in `translate` mode, so
+    translation runs `medium`, `small`, or `base`. Short clips of 2–3 seconds
+    translate poorly and can return empty text; CUDA translate time for 20 s of
+    audio is 0.4–1.1 s. CPU translate measured: 9.45 s for 60 s of speech,
+    against 6.46 s for transcribe. When the pack returns no text, VoiceType keeps
+    the recognized text.
+11. Reference coverage is 0.62–0.66 for Russian, Ukrainian, and Czech against
+    0.82–0.88 for German, French, Dutch, and Swedish, because the pack picks
+    inflected word forms the reference does not use. The number is a fidelity
+    indicator, not a quality score.
 
 ## 6. Test audio
 

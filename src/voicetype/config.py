@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 APP_NAME = "VoiceType"
-CONFIG_VERSION = 1
+CONFIG_VERSION = 2
 
 DEFAULT_HALLUCINATIONS = [
     "Продолжение следует...",
@@ -29,6 +29,13 @@ OVERLAY_POSITIONS = ("bottom-center", "bottom-left", "bottom-right", "top-center
 HOTKEY_MODES = ("hold", "toggle")
 LANGUAGES = ("ru", "en", "auto")
 DEVICES = ("auto", "cuda", "cpu")
+# Translation targets. Whisper translates speech into English only, so every
+# other language runs through English: speech -> English text -> target text,
+# with a local OPUS-MT pack downloaded on demand. The list is a literal so
+# config stays importable without ctranslate2, and tests assert it matches
+# translation.TARGETS.
+TRANSLATION_TARGETS = ("en", "ru", "de", "fr", "es", "it", "nl", "uk", "cs", "sv", "zh")
+DEFAULT_TARGET_LANGUAGE = "en"
 
 
 def app_dir() -> Path:
@@ -85,6 +92,8 @@ class AppConfig:
     hotkey: str = "ctrl+alt+space"
     hotkey_mode: str = "hold"
     language: str = "ru"
+    translation_enabled: bool = False
+    target_language: str = DEFAULT_TARGET_LANGUAGE
     model: str = "auto"
     device: str = "auto"
     microphone: str | None = None
@@ -120,6 +129,9 @@ class AppConfig:
             self.language = "ru"
         if self.device not in DEVICES:
             self.device = "auto"
+        self.translation_enabled = bool(self.translation_enabled)
+        if self.target_language not in TRANSLATION_TARGETS:
+            self.target_language = DEFAULT_TARGET_LANGUAGE
         if self.overlay_position not in OVERLAY_POSITIONS:
             self.overlay_position = "bottom-center"
         self.max_record_seconds = max(5, min(3600, int(self.max_record_seconds)))
