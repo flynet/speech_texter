@@ -123,7 +123,7 @@ configured as the hotkey, VoiceType consumes Space presses system-wide — choos
 | **Language** | Recognition language: Russian, English, or `Auto`. Auto detects the language for every recording and can handle mixed speech, but it is slightly less predictable for short phrases. This setting tells Whisper **which language you speak**; it is separate from translation. |
 | **Translate the recognized text** | Off by default. When enabled, VoiceType converts the recognized text into the target language. English comes from the built-in Whisper `translate` task, running fully offline with no extra download. Every other target runs on a local OPUS-MT pack through English. Translation needs a full multilingual model, so while this option is on VoiceType uses `medium`, `small`, or `base` and shows that model in the tray, even if `large-v3-turbo` was selected for plain recognition. If the target matches the language you speak, the text is kept as it was recognized. |
 | **Translate to** | Target language: English, Russian, German, French, Spanish, Italian, Dutch, Ukrainian, Czech, Swedish, Chinese. English needs no download; the other languages use a pack from the list below. The selector is enabled only while translation is on, and is separate from the **Language** you speak. |
-| **Translation packs** | Pack manager: one row per target language with its size (60-84 MB), a **Download** button with progress and cancel, and **Remove** for an installed pack. Packs are converted OPUS-MT models in the CTranslate2 format, verified against `SHA256SUMS.txt`, stored in `%LOCALAPPDATA%\VoiceType\translation`, and used only on your PC. |
+| **Translation packs** | Pack manager: one row per target language with its size (60-68 MB), a **Download** button with progress and cancel, and **Remove** for an installed pack. Packs are converted OPUS-MT models in the CTranslate2 format, verified against `SHA256SUMS.txt`, stored in `%LOCALAPPDATA%\VoiceType\translation`, and used only on your PC. |
 | **Maximum recording** | Hard limit from 1 to 60 minutes (10 by default). Recording also stops when the hotkey is released in push-to-talk mode. Recordings shorter than 0.3 seconds are ignored. |
 | **Keep the recognized text in the clipboard** | When enabled (default), the last transcription stays on the clipboard, so if the paste target had no focus you can click the field and press `Ctrl+V`. Disable it to restore the previous clipboard content after each automatic insertion. |
 | **Device** | `Auto` uses CUDA when a usable NVIDIA GPU and the CUDA pack are available, otherwise the CPU. `CUDA (NVIDIA)` forces the GPU when possible and falls back to the CPU if CUDA cannot be initialized. `CPU` always uses the processor. |
@@ -306,7 +306,7 @@ build stays small:
 This converts every pinned Helsinki OPUS-MT model to CTranslate2 `int8`, adds
 the two Marian options the HF converter leaves out (`model_type`,
 `add_source_eos`), writes `NOTICE.txt` and `SOURCE.json` into each archive, and
-creates `SHA256SUMS.txt`. Each pack is 60–84 MB. The **Translation packs**
+creates `SHA256SUMS.txt`. Each pack is 60–68 MB. The **Translation packs**
 workflow (tag `mt-packs-v*` or manual dispatch) publishes the archives as
 release `mt-packs-v1`. VoiceType downloads a pack on demand from Settings,
 verifies its SHA-256 against `SHA256SUMS.txt`, and installs it in
@@ -467,7 +467,7 @@ translated never leaves the machine.
   Russian→German directly is not available, because OPUS-MT has no usable
   Russian–German pair. Two stages mean two chances to lose a detail, and the
   pack adds 0.05–0.07 s per phrase.
-- A non-English target needs its pack downloaded once (60–84 MB per language).
+- A non-English target needs its pack downloaded once (60–68 MB per language).
   VoiceType stops with a clear message when the pack is missing, and **Remove**
   in Settings frees the space again.
 - The ten packs in Settings cover the targets that OPUS-MT provides as a direct

@@ -310,7 +310,7 @@ class PackRow(QWidget):
         self._button = QPushButton("Download")
         self._button.setFixedWidth(90)
         self._button.clicked.connect(self._on_button)
-        # A pack is 60-84 MB, so an installed pack can be removed to free space.
+        # A pack is 60-68 MB, so an installed pack can be removed to free space.
         self._remove_button = QPushButton("Remove")
         self._remove_button.setFixedWidth(80)
         self._remove_button.setVisible(False)
@@ -585,7 +585,7 @@ class SettingsWindow(QDialog):
             "Translation is weaker than plain recognition: names, numbers, and "
             "dates can be paraphrased, invented, or dropped, and 2-3 second "
             "clips often translate poorly, so speak 10-20 seconds. Each pack is "
-            "downloaded on demand, takes 60-84 MB of disk, translates a sentence "
+            "downloaded on demand, takes 60-68 MB of disk, translates a sentence "
             "in under 0.1 s on a desktop CPU, and can be removed to free that "
             "space."
         )

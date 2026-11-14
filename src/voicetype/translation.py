@@ -86,7 +86,7 @@ TARGET_LANGUAGES: tuple[TargetLanguage, ...] = (
         asset="voicetype-mt-en-ru.zip",
         source_repo="Helsinki-NLP/opus-mt-en-ru",
         license="Apache-2.0",
-        size_mb=84,
+        size_mb=67,
     ),
     TargetLanguage(
         code="de",

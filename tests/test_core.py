@@ -725,7 +725,7 @@ class TranslationPackTests(unittest.TestCase):
         from voicetype import translation
 
         self.assertEqual(translation.pack_size_bytes("en"), 0)
-        self.assertEqual(translation.pack_size_bytes("ru"), 84 * 1024 * 1024)
+        self.assertEqual(translation.pack_size_bytes("ru"), 67 * 1024 * 1024)
 
     def test_deleting_a_pack_unloads_it_first(self) -> None:
         from voicetype import translation

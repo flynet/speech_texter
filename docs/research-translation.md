@@ -62,7 +62,7 @@ text at all**. Speak 10–20 seconds when you want a usable translation.
 | Engine | Direction | Size on disk | Speed | License | Extra Python deps |
 | --- | --- | --- | --- | --- | --- |
 | Whisper `task="translate"` (in use) | any → English | 0 (same model) | same as transcription | MIT | none |
-| OPUS-MT / Marian via CTranslate2 (converted by `scripts/build_mt_packs.py`) | fixed pairs, most through English | 60–84 MB per pair in `int8` | measured: 0.05–0.07 s per phrase on CPU, 4 threads, 91–105 MB RAM | Apache-2.0 (`opus-mt-en-de` is CC-BY-4.0) | `sentencepiece` only |
+| OPUS-MT / Marian via CTranslate2 (converted by `scripts/build_mt_packs.py`) | fixed pairs, most through English | 60–68 MB per pair in `int8` | measured: 0.05–0.07 s per phrase on CPU, 4 threads, 91–105 MB RAM | Apache-2.0 (`opus-mt-en-de` is CC-BY-4.0) | `sentencepiece` only |
 | NLLB-200-distilled-600M via CTranslate2 int8 (`Serkan007/CTranslate2-nllb-200-int8`) | 200 languages, any pair | 623 MB | slower than Marian; needs CPU benchmark | **CC-BY-NC-4.0** (non-commercial; the mirror has no LICENSE file) | `sentencepiece` only |
 | Argos Translate (ArgosSpm packs) | fixed pairs | 25–35 MB | slow on CPU | MIT for packs | `stanza` → torch, `spacy`, `sacremoses`, `minisbd` → PyInstaller bloat |
 | `transformers` + PyTorch NLLB/Marian | any pair | ~2 GB+ runtime | slow on CPU | MIT / CC-BY-NC | torch, transformers → bloat, no CTranslate2 speed |
@@ -133,7 +133,7 @@ installer.
 6. Packs are converted by `scripts/build_mt_packs.py` from the Helsinki source
    models, not downloaded pre-converted from `gaudi`: the published packs lack
    the Marian keys, and building them in CI keeps the toolchain pinned. Measured
-   int8 zip sizes: 60 MB (de, fr), 64–68 MB (sv, uk, cs, nl, es, zh), 84 MB (ru).
+   int8 zip sizes: 60 MB (de, fr), 64–68 MB (sv, uk, cs, nl, es, zh, ru).
 
 Rejected routes: Argos (torch chain), `transformers`+torch (bloat), NLLB
 CC-BY-NC (needs a project license decision).

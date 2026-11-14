@@ -187,7 +187,7 @@ Phase 2 (done, see `docs/research-translation.md`):
   chunks of ≤40 words, decode cap `min(4 × source, 128)` tokens), idle unload,
   `forget_translator`, `delete_pack`.
 - Packs are converted from `Helsinki-NLP/opus-mt-en-*` by
-  `scripts/build_mt_packs.py` (`int8`, 60–84 MB each) with `NOTICE.txt` and
+  `scripts/build_mt_packs.py` (`int8`, 60–68 MB each) with `NOTICE.txt` and
   `SOURCE.json`, published by `.github/workflows/mt-packs.yml` as `mt-packs-v1`.
   Pre-converted `gaudi` packs are not used: the project runs the converter
   itself, because Marian needs `model_type=marian` and `add_source_eos` that the
@@ -239,7 +239,7 @@ recognized text.
 9. Non-English pairs are sparse in the OPUS-MT catalog, so most of them need the
    English pivot: two stages, extra latency, quality loss. Measured pack CPU cost
    is 0.05–0.07 s per phrase, under a second per dictation run, and a pack is
-   60–84 MB in `int8`, not the ~150 MB of the published HF conversions.
+   60–68 MB in `int8`, not the ~150 MB of the published HF conversions.
 10. Distilled Whisper models keep the source language in `translate` mode, so
     translation runs `medium`, `small`, or `base`. Short clips of 2–3 seconds
     translate poorly and can return empty text; CUDA translate time for 20 s of
