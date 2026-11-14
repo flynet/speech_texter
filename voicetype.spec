@@ -95,10 +95,12 @@ def collect_libs(package: str) -> list[tuple[str, str]]:
 
     Delvewheel renames the bundled Microsoft C++ runtime DLLs to hash names and
     patches the package to add `<package>.libs` to the DLL search path.
-    PyInstaller sees those DLLs as system runtime and collects them under their
-    plain names, so the hash name the extension asks for is missing and the
-    extension fails to load with `DLL load failed while importing
-    _sentencepiece`. Copy the directory the way the wheel ships it.
+    PyInstaller recognizes those DLLs as the Microsoft C++ runtime, normalizes
+    the name to `msvcp140.dll`, and puts the copy in the bundle root, so the hash
+    name the extension asks for is gone and the extension fails to load with
+    `DLL load failed while importing _sentencepiece`. Copy the DLLs as data, so
+    they are copied verbatim, and skip a package whose own hook collects the
+    directory (numpy, av, pandas do).
     """
     lib_dir = SITE_PACKAGES / f"{package}.libs"
     if not lib_dir.is_dir():
@@ -122,12 +124,10 @@ for package in (
     datas += package_datas
     binaries += package_binaries
     hiddenimports += package_hiddenimports
-    # collect_all renames the hashed runtime DLLs, so copy them by hand.
-    collected = {tuple(entry[:2]) for entry in binaries}
-    for source, destination in collect_libs(package):
-        if (source, destination) not in collected:
-            binaries.append((source, destination))
-            collected.add((source, destination))
+    lib_dir = SITE_PACKAGES / f"{package}.libs"
+    if any(dest == lib_dir.name for _src, dest in package_binaries + package_datas):
+        continue
+    datas += collect_libs(package)
 
 a = Analysis(
     [str(SRC / "voicetype" / "__main__.py")],
