@@ -453,6 +453,91 @@ class DownloadCancelNotificationTests(unittest.TestCase):
         )
 
 
+class ModelSwitchNoticeTests(unittest.TestCase):
+    """A model that is not the requested one names the real reason."""
+
+    def _stub(self, model: str, translate: bool, target: str = "zh"):
+        import types
+
+        from voicetype.app import VoiceTypeApplication
+
+        notified: list[tuple[str, str]] = []
+        statuses: list[str] = []
+        stub = SimpleNamespace(
+            config=AppConfig(
+                model=model, translation_enabled=translate, target_language=target
+            ),
+            _state="idle",
+            _model_loaded=False,
+            _active_device="cuda",
+            _last_use=0.0,
+            _selection=hardware.Selection("cuda", model, "CUDA selected in settings"),
+            _tray=SimpleNamespace(
+                notify=lambda title, message: notified.append((title, message)),
+                set_state=lambda state: None,
+                set_status_text=lambda text: statuses.append(text),
+            ),
+        )
+        stub._on_model_ready = types.MethodType(VoiceTypeApplication._on_model_ready, stub)
+        stub._model_switch_notice = types.MethodType(
+            VoiceTypeApplication._model_switch_notice, stub
+        )
+        # The real tray line logic, not a copy of it.
+        stub._status_text = types.MethodType(VoiceTypeApplication._status_text, stub)
+        stub._device_label = types.MethodType(VoiceTypeApplication._device_label, stub)
+        return stub, notified, statuses
+
+    def test_a_turbo_model_names_the_translation_limitation(self) -> None:
+        # The turbo model is installed and fast; it is unusable for translation
+        # because it keeps the source language. "not available" reads as a
+        # download problem, which is not the case here.
+        stub, notified, statuses = self._stub("large-v3-turbo", True)
+        stub._on_model_ready("medium", "cuda")
+        title, body = notified[0]
+        self.assertEqual(title, "Translation model")
+        self.assertIn("Large v3 Turbo", body)
+        self.assertIn("Medium", body)
+        self.assertIn("cannot translate", body)
+        self.assertNotIn("not available", body)
+
+    def test_the_tray_keeps_the_translation_target_after_the_load(self) -> None:
+        # The line shows the target while loading, so it must not lose the
+        # suffix when the model is ready.
+        stub, notified, statuses = self._stub("large-v3-turbo", True)
+        stub._on_model_ready("medium", "cuda")
+        self.assertEqual(statuses, ["Medium · CUDA · translate \u2192 ZH"])
+
+    def test_a_missing_model_names_the_download(self) -> None:
+        stub, notified, statuses = self._stub("large-v3-turbo", False)
+        stub._on_model_ready("small", "cuda")
+        title, body = notified[0]
+        self.assertEqual(title, "Model not downloaded")
+        self.assertIn("Large v3 Turbo is not downloaded", body)
+        self.assertIn("Small", body)
+        self.assertIn("Settings", body)
+
+    def test_a_full_model_that_is_missing_is_a_download(self) -> None:
+        # Translation is on, and the requested model can translate, so the only
+        # reason to switch is that its files are not on disk.
+        stub, notified, statuses = self._stub("medium", True)
+        stub._on_model_ready("small", "cpu")
+        title, body = notified[0]
+        self.assertEqual(title, "Model not downloaded")
+        self.assertNotIn("cannot translate", body)
+        # The device label follows the device the model actually loaded on.
+        self.assertEqual(statuses, ["Small · CPU · translate \u2192 ZH"])
+
+    def test_no_notice_when_the_model_is_the_requested_one(self) -> None:
+        stub, notified, statuses = self._stub("medium", True)
+        stub._on_model_ready("medium", "cuda")
+        self.assertEqual(notified, [])
+
+    def test_no_notice_in_auto_mode(self) -> None:
+        stub, notified, statuses = self._stub("auto", True)
+        stub._on_model_ready("medium", "cuda")
+        self.assertEqual(notified, [])
+
+
 class InserterClipboardTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

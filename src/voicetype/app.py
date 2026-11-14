@@ -207,13 +207,39 @@ class VoiceTypeApplication(QObject):
         display = models.MODELS.get(model_key)
         name = display.display_name if display else model_key
         if self._state == "idle":
-            self._tray.set_status_text(f"{name} · {device.upper()}")
+            # The tray line keeps the translation target, the same line the
+            # loading state shows, so the suffix does not disappear at load.
+            self._tray.set_status_text(self._status_text(name))
         log.info("Model %s is ready on %s", model_key, device)
         if self.config.model != "auto" and self.config.model != model_key:
-            self._tray.notify(
-                "VoiceType",
-                f"Requested model {self.config.model} is not available; using {model_key}.",
+            title, body = self._model_switch_notice(model_key)
+            self._tray.notify(title, body)
+
+    def _model_switch_notice(self, model_key: str) -> tuple[str, str]:
+        """Say why the loaded model is not the requested one, in display names.
+
+        There are two reasons, and saying `not available` for both reads like a
+        download problem. A fast distilled turbo model is installed and usable for
+        recognition; it is only unusable for translation, which needs a full
+        multilingual model. A model that is not on disk needs a download.
+        """
+
+        def display(key: str) -> str:
+            info = models.MODELS.get(key)
+            return info.display_name if info else key
+
+        requested = display(self.config.model)
+        used = display(model_key)
+        if self.config.translation_enabled and self.config.model not in models.TRANSLATION_MODEL_ORDER:
+            return (
+                "Translation model",
+                f"Translation needs a full multilingual model. {requested} cannot "
+                f"translate, so VoiceType uses {used}.",
             )
+        return (
+            "Model not downloaded",
+            f"{requested} is not downloaded. VoiceType uses {used}. Download it in Settings.",
+        )
 
     def _on_model_unloaded(self) -> None:
         self._model_loaded = False

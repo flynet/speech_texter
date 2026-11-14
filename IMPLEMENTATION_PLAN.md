@@ -286,6 +286,15 @@ recognized text.
     the row, logs at info, and emits no failure notice, while real failures keep
     their `... failed` title. The CUDA tray line is restored when a download is
     cancelled with no Settings window open, which is the CUDA prompt path.
+14. A tray notice read `Requested model large-v3-turbo is not available; using
+    medium` on a machine where that model is installed and loads fine. `not
+    available` reads as a download failure for two different causes: a translation
+    target needs a full multilingual model (the fast distilled turbo model is
+    installed and fast, unusable only for translation), and a model whose files
+    are not on disk. The notice is now split by cause, `Translation model` and
+    `Model not downloaded`, with display names, and the tray line keeps
+    `translate → target` after the load: the ready handler used the raw
+    `name · DEVICE` line, so the suffix vanished the moment the model was ready.
 
 ## 6. Test audio
 

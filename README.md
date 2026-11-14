@@ -446,7 +446,8 @@ is given, and the numbers Whisper wrote down are the numbers the user gets.
 - [ ] CUDA mode falls back to CPU if the CUDA pack is missing or broken
 - [x] The **CUDA pack** row shows progress with **Cancel**, returns to **Download** on a cancel with no failure notice, reports `CUDA acceleration failed` on a real download error, announces the installed pack on success, and the tray status line goes back to the model and device when a download is cancelled with no Settings window open
 - [x] With **Translate the recognized text** on, Russian speech becomes English text; with it off, the original language output is returned
-- [x] With translation on, the tray status shows a full multilingual model (`medium`, `small`, or `base`) and `translate → EN` for an English target, not `large-v3-turbo`
+- [x] With translation on, the tray status shows a full multilingual model (`medium`, `small`, or `base`) and `translate → EN` for an English target, not `large-v3-turbo`, and the tray line keeps `translate → target` after the model is ready
+- [x] A model that is not the requested one names the real reason: `Translation model / Translation needs a full multilingual model. Large v3 Turbo cannot translate, so VoiceType uses Medium.` when translation is on, and `Model not downloaded / Large v3 Turbo is not downloaded. VoiceType uses Small. Download it in Settings.` when the files are missing, not `is not available` for both
 - [x] The tray shows the selected target (`translate → DE` for German), and the test bench result names it
 - [x] The **Language** selector and the translation target selector act independently
 - [x] A target that needs a pack reports the missing pack before Whisper loads, and its row in Settings downloads it with progress and cancel; a cancelled download leaves the row at **Download** with no failure notice (model, CUDA, and update downloads behave the same)
